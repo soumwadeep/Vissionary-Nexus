@@ -13,14 +13,17 @@ import {
   Trophy,
   Settings,
   LogOut,
+  Home,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useState } from "react"
 import { cn } from "@/lib/utils"
+import { useAuth } from "@/hooks/use-auth"
 
 const menuItems = [
+  { icon: Home, label: "Home", href: "/" },
   { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard/host" },
   { icon: CalendarPlus, label: "Create Event", href: "/dashboard/host/create-event" },
   { icon: Users, label: "Participants", href: "/dashboard/host/participants" },
@@ -34,6 +37,7 @@ const menuItems = [
 export function HostSidebar() {
   const pathname = usePathname()
   const [collapsed, setCollapsed] = useState(false)
+  const { logout } = useAuth()
 
   return (
     <motion.aside
@@ -48,9 +52,7 @@ export function HostSidebar() {
         {/* Logo */}
         <div className="p-4 border-b border-sidebar-border">
           <Link href="/" className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-chart-2/20 border border-chart-2/30 flex items-center justify-center shrink-0">
-              <span className="text-chart-2 font-bold">VN</span>
-            </div>
+            <img src="/apple-icon.png" alt="Vissionary Nexus" className="w-14 h-14 rounded-xl shrink-0" />
             {!collapsed && (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
                 <span className="font-bold text-lg">Nexus</span>
@@ -88,6 +90,7 @@ export function HostSidebar() {
         <div className="p-4 border-t border-sidebar-border space-y-2">
           <Button
             variant="ghost"
+            onClick={logout}
             className={cn(
               "w-full justify-start text-sidebar-foreground/70 hover:text-destructive",
               collapsed && "justify-center"

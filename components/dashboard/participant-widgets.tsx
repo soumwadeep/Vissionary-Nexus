@@ -5,35 +5,39 @@ import { Calendar, Trophy, Users, Zap, TrendingUp, Star, ArrowRight, Activity, B
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { useEffect, useState } from "react"
+import useSWR from "swr"
 import { HolographicPanel, FloatingElement, PulseRing } from "@/components/ecosystem/micro-interactions"
 import { WalletStatusWidget } from "@/components/web3/wallet-status-widget"
 import { BlockchainReputationMeter } from "@/components/web3/blockchain-reputation"
 import { SomniaSyncIndicator } from "@/components/web3/somnia-sync-indicator"
 import { NFTAchievementShowcase } from "@/components/web3/nft-achievements"
+import { useWalletAuth } from "@/hooks/use-wallet-auth"
 
-const upcomingEvents = [
-  {
-    id: 1,
-    title: "AI Innovation Hackathon",
-    date: "Dec 15-17, 2024",
-    participants: 234,
-    prize: "$10,000",
-  },
-  {
-    id: 2,
-    title: "Web3 Builders Challenge",
-    date: "Dec 20-22, 2024",
-    participants: 156,
-    prize: "$5,000",
-  },
-  {
-    id: 3,
-    title: "Green Tech Sprint",
-    date: "Jan 5-7, 2025",
-    participants: 89,
-    prize: "$7,500",
-  },
-]
+// Fetcher with wallet address header
+const fetcher = (url: string, walletAddress?: string) =>
+  fetch(url, {
+    headers: walletAddress ? { 'x-wallet-address': walletAddress } : {}
+  }).then(res => res.json())
+
+interface Event {
+  id: string
+  title: string
+  start_date: string
+  end_date: string
+  prize_pool: string
+  max_participants: number
+  status: string
+  isRegistered?: boolean
+}
+
+interface UserStats {
+  hackathonsJoined: number
+  projectsCreated: number
+  collaborations: number
+  achievements: number
+  reputationScore: number
+  totalPoints: number
+}
 
 const initialRecommendations = [
   { id: 1, text: "Complete your profile to improve team matching by 45%", isNew: true },
@@ -47,38 +51,49 @@ const recentCollaborations = [
   { name: "Elena Rodriguez", role: "Designer", project: "Mobile App" },
 ]
 
+// Format date for display
+function formatEventDate(startDate: string, endDate: string): string {
+  const start = new Date(startDate)
+  const end = new Date(endDate)
+  const options: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric' }
+  return `${start.toLocaleDateString('en-US', options)} - ${end.toLocaleDateString('en-US', { ...options, year: 'numeric' })}`
+}
+
 export function ParticipantWidgets() {
+  const { walletAddress, isConnected } = useWalletAuth()
+  
+  // Fetch real stats from API
+  const { data: statsData } = useSWR<UserStats>(
+    isConnected ? ['/api/user/stats', walletAddress] : null,
+    ([url, wallet]) => fetcher(url, wallet as string),
+    { refreshInterval: 30000 }
+  )
+
+  // Fetch real events from API
+  const { data: eventsData } = useSWR<{ events: Event[] }>(
+    ['/api/events?status=upcoming&limit=3', walletAddress],
+    ([url, wallet]) => fetcher(url, wallet as string | undefined),
+    { refreshInterval: 60000 }
+  )
+
+  const upcomingEvents = eventsData?.events || []
+  
   const [recommendations, setRecommendations] = useState(initialRecommendations)
   const [activityPulse, setActivityPulse] = useState(false)
-  const [stats, setStats] = useState([
-    { icon: Trophy, label: "Current Rank", value: 42, display: "#42", change: "+5" },
-    { icon: Star, label: "Reputation", value: 847, display: "847", change: "+23" },
-    { icon: Users, label: "Collaborations", value: 12, display: "12", change: "+2" },
-    { icon: Zap, label: "Tasks Done", value: 34, display: "34", change: "+8" },
-  ])
+  
+  // Build stats from real data
+  const stats = [
+    { icon: Trophy, label: "Hackathons", value: statsData?.hackathonsJoined || 0, display: (statsData?.hackathonsJoined || 0).toString(), change: "+0" },
+    { icon: Star, label: "Reputation", value: statsData?.reputationScore || 0, display: (statsData?.reputationScore || 0).toString(), change: "+0" },
+    { icon: Users, label: "Collaborations", value: statsData?.collaborations || 0, display: (statsData?.collaborations || 0).toString(), change: "+0" },
+    { icon: Zap, label: "Achievements", value: statsData?.achievements || 0, display: (statsData?.achievements || 0).toString(), change: "+0" },
+  ]
 
-  // Simulate live updates
+  // Activity pulse animation
   useEffect(() => {
     const interval = setInterval(() => {
       setActivityPulse(true)
       setTimeout(() => setActivityPulse(false), 500)
-
-      // Randomly update a stat
-      if (Math.random() > 0.7) {
-        setStats((prev) =>
-          prev.map((stat, i) => {
-            if (i === Math.floor(Math.random() * 4)) {
-              const newValue = stat.value + Math.floor(Math.random() * 3)
-              return {
-                ...stat,
-                value: newValue,
-                display: stat.label === "Current Rank" ? `#${newValue}` : newValue.toString(),
-              }
-            }
-            return stat
-          })
-        )
-      }
     }, 5000)
 
     return () => clearInterval(interval)
@@ -106,7 +121,7 @@ export function ParticipantWidgets() {
   }, [])
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 min-w-0">
       {/* Stats Row */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -172,22 +187,28 @@ export function ParticipantWidgets() {
           </Button>
         </div>
         <div className="space-y-4">
-          {upcomingEvents.map((event, index) => (
-            <motion.div
-              key={event.id}
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.3 + index * 0.1 }}
-              whileHover={{ x: 5, backgroundColor: "rgba(74, 222, 128, 0.05)" }}
-              className="p-3 rounded-lg bg-secondary/50 border border-border hover:border-primary/30 transition-all cursor-pointer"
-            >
-              <div className="font-medium text-sm mb-1">{event.title}</div>
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span>{event.date}</span>
-                <span className="text-primary font-semibold">{event.prize}</span>
-              </div>
-            </motion.div>
-          ))}
+          {upcomingEvents.length === 0 ? (
+            <div className="text-sm text-muted-foreground text-center py-4">
+              No upcoming events. Check back soon!
+            </div>
+          ) : (
+            upcomingEvents.map((event, index) => (
+              <motion.div
+                key={event.id}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.3 + index * 0.1 }}
+                whileHover={{ x: 5, backgroundColor: "rgba(74, 222, 128, 0.05)" }}
+                className="p-3 rounded-lg bg-secondary/50 border border-border hover:border-primary/30 transition-all cursor-pointer"
+              >
+                <div className="font-medium text-sm mb-1">{event.title}</div>
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>{formatEventDate(event.start_date, event.end_date)}</span>
+                  <span className="text-primary font-semibold">{event.prize_pool}</span>
+                </div>
+              </motion.div>
+            ))
+          )}
         </div>
       </motion.div>
 
@@ -399,7 +420,7 @@ export function ParticipantWidgets() {
             Somnia Ready
           </span>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 min-w-0">
           <WalletStatusWidget />
           <BlockchainReputationMeter />
           <SomniaSyncIndicator />

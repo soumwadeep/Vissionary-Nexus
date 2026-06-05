@@ -15,14 +15,17 @@ import {
   User,
   Settings,
   LogOut,
+  Home,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useState } from "react"
 import { cn } from "@/lib/utils"
+import { useAuth } from "@/hooks/use-auth"
 
 const menuItems = [
+  { icon: Home, label: "Home", href: "/" },
   { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard/participant" },
   { icon: Calendar, label: "Events", href: "/dashboard/participant/events" },
   { icon: Users, label: "AI Team Match", href: "/dashboard/participant/team-match" },
@@ -38,6 +41,7 @@ const menuItems = [
 export function ParticipantSidebar() {
   const pathname = usePathname()
   const [collapsed, setCollapsed] = useState(false)
+  const { logout } = useAuth()
 
   return (
     <motion.aside
@@ -52,9 +56,7 @@ export function ParticipantSidebar() {
         {/* Logo */}
         <div className="p-4 border-b border-sidebar-border">
           <Link href="/" className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-primary/20 border border-primary/30 flex items-center justify-center shrink-0 glow-border">
-              <span className="text-primary font-bold">VN</span>
-            </div>
+            <img src="/apple-icon.png" alt="Vissionary Nexus" className="w-14 h-14 rounded-xl glow-border shrink-0" />
             {!collapsed && (
               <motion.span
                 initial={{ opacity: 0 }}
@@ -95,6 +97,7 @@ export function ParticipantSidebar() {
         <div className="p-4 border-t border-sidebar-border space-y-2">
           <Button
             variant="ghost"
+            onClick={logout}
             className={cn(
               "w-full justify-start text-sidebar-foreground/70 hover:text-destructive",
               collapsed && "justify-center"

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Brain, Send, Sparkles, Code, Lightbulb, BookOpen, Bug, Cpu, Zap, Activity } from "lucide-react"
 import { useState, useRef, useEffect } from "react"
+import { analyticsEvents } from "@/lib/analytics"
 
 const suggestedPrompts = [
   { icon: Lightbulb, text: "Help me brainstorm project ideas for the AI hackathon" },
@@ -38,7 +39,16 @@ export default function AIMentorPage() {
   const [displayedText, setDisplayedText] = useState("")
   const [isGenerating, setIsGenerating] = useState(false)
   const [aiActivity, setAiActivity] = useState(false)
+  const [hasTrackedOpened, setHasTrackedOpened] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  // Track AI Mentor opened
+  useEffect(() => {
+    if (!hasTrackedOpened) {
+      analyticsEvents.aiMentorOpened()
+      setHasTrackedOpened(true)
+    }
+  }, [hasTrackedOpened])
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })

@@ -27,44 +27,47 @@ export function WalletStatusWidget() {
 
   if (!isConnected) {
     return (
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="glass-card p-4 rounded-xl border border-border/50"
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
-              <Wallet className="w-5 h-5 text-muted-foreground" />
+      <>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="relative z-10 glass-card p-4 rounded-xl border border-border/50 min-w-0"
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                <Wallet className="w-5 h-5 text-muted-foreground" />
+              </div>
+              <div className="min-w-0">
+                <p className="font-medium text-sm">Wallet Status</p>
+                <p className="text-xs text-muted-foreground">Not connected</p>
+              </div>
             </div>
-            <div>
-              <p className="font-medium text-sm">Wallet Status</p>
-              <p className="text-xs text-muted-foreground">Not connected</p>
-            </div>
+            <Button size="sm" className="relative z-20 shrink-0" onClick={() => setIsModalOpen(true)}>
+              Connect
+            </Button>
           </div>
-          <Button size="sm" onClick={() => setIsModalOpen(true)}>
-            Connect
-          </Button>
-        </div>
+        </motion.div>
         <WalletConnectModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
-      </motion.div>
+      </>
     )
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="relative"
-    >
-      {/* Glow for Somnia network */}
-      {isSomniaNetwork && (
-        <motion.div
-          className="absolute -inset-0.5 rounded-xl bg-primary/20 blur-md -z-10"
-          animate={{ opacity: [0.3, 0.5, 0.3] }}
-          transition={{ duration: 2, repeat: Infinity }}
-        />
-      )}
+    <>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="relative z-10 min-w-0"
+      >
+        {/* Glow for Somnia network */}
+        {isSomniaNetwork && (
+          <motion.div
+            className="absolute -inset-0.5 rounded-xl bg-primary/20 blur-md -z-10"
+            animate={{ opacity: [0.3, 0.5, 0.3] }}
+            transition={{ duration: 2, repeat: Infinity }}
+          />
+        )}
 
       <div className="glass-card p-4 rounded-xl border border-primary/20">
         {/* Connection status */}
@@ -133,7 +136,9 @@ export function WalletStatusWidget() {
         </div>
       </div>
 
+      </motion.div>
+
       <WalletConnectModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
-    </motion.div>
+    </>
   )
 }

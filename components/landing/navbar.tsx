@@ -29,9 +29,7 @@ export function Navbar() {
           <div className="flex items-center justify-between">
             {/* Logo */}
             <Link href="/" className="flex items-center gap-2">
-              <div className="w-10 h-10 rounded-lg bg-primary/20 border border-primary/30 flex items-center justify-center glow-border">
-                <span className="text-primary font-bold text-lg">VN</span>
-              </div>
+              <img src="/apple-icon.png" alt="Vissionary Nexus" className="w-14 h-14 rounded-xl glow-border" />
               <span className="text-xl font-bold hidden sm:block">Vissionary Nexus</span>
             </Link>
 

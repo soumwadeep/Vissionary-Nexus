@@ -65,7 +65,7 @@ export function NetworkSwitchModal({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40"
+            className="fixed inset-0 bg-black/80 backdrop-blur-md z-[99998]"
           />
 
           {/* Modal */}
@@ -74,7 +74,7 @@ export function NetworkSwitchModal({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             transition={{ duration: 0.3 }}
-            className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50"
+            className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[99999]"
           >
             <div className="bg-slate-950 border border-primary/30 rounded-xl p-6 w-96 shadow-2xl">
               {/* Header */}

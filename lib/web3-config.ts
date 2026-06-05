@@ -40,14 +40,14 @@ export const somniaMainnet = {
   testnet: false,
 } as const
 
+const walletConnectProjectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID
+
 // Create wagmi config
 export const wagmiConfig = createConfig({
   chains: [mainnet, sepolia, polygon, arbitrum, somniaTestnet],
   connectors: [
     injected(),
-    walletConnect({
-      projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || "demo",
-    }),
+    ...(walletConnectProjectId ? [walletConnect({ projectId: walletConnectProjectId })] : []),
   ],
   storage: createStorage({ storage: typeof window !== "undefined" ? window.localStorage : undefined }),
   transports: {
