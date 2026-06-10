@@ -6,6 +6,16 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Brain, Send, Sparkles, Code, Lightbulb, BookOpen, Bug, Cpu, Zap, Activity } from "lucide-react"
 import { useState, useRef, useEffect } from "react"
+import { analyticsEvents } from "@/lib/analytics"
+import { useWalletAuth } from "@/hooks/use-wallet-auth"
+
+interface Message {
+  id: string | number
+  role: "user" | "assistant"
+  content: string
+  timestamp?: Date
+  isFallback?: boolean
+}
 
 const suggestedPrompts = [
   { icon: Lightbulb, text: "Help me brainstorm project ideas for the AI hackathon" },
@@ -15,14 +25,14 @@ const suggestedPrompts = [
 ]
 
 const thinkingPhrases = [
-  "Analyzing your request...",
-  "Processing context...",
-  "Generating response...",
-  "Optimizing suggestions...",
-  "Finalizing recommendations...",
+  "Analyzing your question...",
+  "Thinking deeply...",
+  "Preparing guidance...",
+  "Refining my response...",
+  "Crafting helpful tips..."
 ]
 
-const initialMessages = [
+const initialMessages: Message[] = [
   {
     id: 1,
     role: "assistant",
@@ -31,14 +41,24 @@ const initialMessages = [
 ]
 
 export default function AIMentorPage() {
-  const [messages, setMessages] = useState(initialMessages)
+  const { profile } = useWalletAuth()
+  const [messages, setMessages] = useState<Message[]>(initialMessages)
   const [input, setInput] = useState("")
   const [isTyping, setIsTyping] = useState(false)
   const [thinkingPhrase, setThinkingPhrase] = useState(0)
   const [displayedText, setDisplayedText] = useState("")
   const [isGenerating, setIsGenerating] = useState(false)
   const [aiActivity, setAiActivity] = useState(false)
+  const [hasTrackedOpened, setHasTrackedOpened] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  // Track AI Mentor opened
+  useEffect(() => {
+    if (!hasTrackedOpened) {
+      analyticsEvents.aiMentorOpened()
+      setHasTrackedOpened(true)
+    }
+  }, [hasTrackedOpened])
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -50,12 +70,13 @@ export default function AIMentorPage() {
 
   // Thinking phrase rotation
   useEffect(() => {
+    let interval: NodeJS.Timeout
     if (isTyping) {
-      const interval = setInterval(() => {
+      interval = setInterval(() => {
         setThinkingPhrase((prev) => (prev + 1) % thinkingPhrases.length)
-      }, 1200)
-      return () => clearInterval(interval)
+      }, 1500)
     }
+    return () => clearInterval(interval)
   }, [isTyping])
 
   // AI activity pulse
@@ -67,33 +88,53 @@ export default function AIMentorPage() {
     return () => clearInterval(interval)
   }, [])
 
-  const handleSend = () => {
-    if (!input.trim()) return
+  const handleSend = async () => {
+    if (!input.trim() || isTyping || isGenerating) return;
 
-    const userMessage = {
-      id: messages.length + 1,
-      role: "user" as const,
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      role: "user",
       content: input,
+      timestamp: new Date(),
     }
 
-    setMessages((prev) => [...prev, userMessage])
+    const newMessages = [...messages, userMessage]
+    setMessages(newMessages)
     setInput("")
     setIsTyping(true)
 
-    // Simulate AI thinking and response
-    setTimeout(() => {
+    // Track analytics
+    analyticsEvents.aiMentorMessageSent()
+
+    try {
+      // Prepare user profile for context
+      const userProfile = profile ? {
+        role: profile.role,
+        skills: ['React', 'TypeScript', 'Problem Solving'],
+        interests: profile.interests,
+        reputation: profile.reputation
+      } : null
+
+      const response = await fetch('/api/ai/mentor', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: newMessages.map(msg => ({
+            role: msg.role,
+            content: msg.content
+          })),
+          userProfile
+        })
+      })
+
+      const data = await response.json()
+      const fullResponse = data.message
+      const isFallback = data.isFallback
+
+      // Show typing indicator, then add message
       setIsTyping(false)
       setIsGenerating(true)
-
-      const responses = [
-        "That's a great question! Based on your current skills and the upcoming hackathons, I'd recommend focusing on a project that combines your React expertise with AI. Consider building an intelligent dashboard that uses natural language processing to generate insights from data.",
-        "I've analyzed your codebase and here are some suggestions: 1) Consider implementing proper error boundaries in your React components, 2) Your state management could benefit from using React Query for server state, 3) Add proper TypeScript types to improve code maintainability.",
-        "For machine learning, I recommend starting with these resources: 1) Fast.ai's practical deep learning course, 2) The 'Hands-On Machine Learning' book by Aurélien Géron, 3) Kaggle competitions for practical experience. Would you like me to create a personalized learning roadmap?",
-        "Looking at your API integration, the issue might be related to CORS headers or authentication token handling. Try checking if your backend properly sets the Access-Control-Allow-Origin header. Also, ensure you're refreshing tokens before they expire.",
-      ]
-
-      const fullResponse = responses[Math.floor(Math.random() * responses.length)]
-
+      
       // Typewriter effect
       let currentIndex = 0
       const typeInterval = setInterval(() => {
@@ -105,15 +146,30 @@ export default function AIMentorPage() {
           setIsGenerating(false)
           setDisplayedText("")
 
-          const aiMessage = {
-            id: messages.length + 2,
-            role: "assistant" as const,
+          const aiMessage: Message = {
+            id: (Date.now() + 1).toString(),
+            role: "assistant",
             content: fullResponse,
+            timestamp: new Date(),
+            isFallback
           }
-          setMessages((prev) => [...prev, aiMessage])
+          setMessages(prev => [...prev, aiMessage])
+          analyticsEvents.aiMentorResponseGenerated()
         }
       }, 20)
-    }, 2500)
+    } catch (error) {
+      console.error('AI mentor frontend error:', error)
+      // In case something really goes wrong, we should still show a fallback
+      const fallbackMsg: Message = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: "I'm having trouble thinking right now. Could you try asking again in a moment?",
+        timestamp: new Date(),
+        isFallback: true
+      }
+      setIsTyping(false)
+      setMessages(prev => [...prev, fallbackMsg])
+    }
   }
 
   const handlePromptClick = (prompt: string) => {
@@ -222,7 +278,7 @@ export default function AIMentorPage() {
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
                 </span>
-                <span className="text-primary">Online</span>
+                <span className="text-primary">Active</span>
               </div>
             </div>
             <motion.div
@@ -266,7 +322,7 @@ export default function AIMentorPage() {
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
                 </span>
-                Always available
+                Always available to help
               </div>
             </div>
             <motion.div
@@ -304,9 +360,12 @@ export default function AIMentorPage() {
                         <Brain className="w-4 h-4 text-primary" />
                       </motion.div>
                       <span className="text-xs font-medium text-primary">AI Mentor</span>
+                      {message.isFallback && (
+                        <span className="text-xs bg-amber-500/10 text-amber-400 px-2 py-0.5 rounded">Offline mode</span>
+                      )}
                     </div>
                   )}
-                  <p className="text-sm leading-relaxed">{message.content}</p>
+                  <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
                 </motion.div>
               </motion.div>
             ))}
@@ -336,7 +395,7 @@ export default function AIMentorPage() {
                         typing...
                       </motion.span>
                     </div>
-                    <p className="text-sm leading-relaxed">
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap">
                       {displayedText}
                       <motion.span
                         animate={{ opacity: [1, 0, 1] }}

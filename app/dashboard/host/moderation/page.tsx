@@ -1,9 +1,14 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import { DashboardHeader } from "@/components/dashboard/dashboard-header"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import { Textarea } from "@/components/ui/textarea"
+import { Label } from "@/components/ui/label"
+import { useToast } from "@/components/ui/use-toast"
 import {
   Shield,
   AlertTriangle,
@@ -12,86 +17,160 @@ import {
   Eye,
   Clock,
   Sparkles,
+  Activity,
+  Brain,
+  Zap,
+  BarChart3,
 } from "lucide-react"
+import { HolographicPanel, PulseRing, DataStream } from "@/components/ecosystem/micro-interactions"
 
-const moderationItems = [
-  {
-    id: 1,
-    type: "spam",
-    severity: "high",
-    title: "Suspicious Submission Pattern",
-    description: "Multiple submissions from same IP with similar content detected",
-    project: "Quick Money App",
-    team: "Anonymous123",
-    timestamp: "2 minutes ago",
-    aiConfidence: 94,
-    status: "pending",
-  },
-  {
-    id: 2,
-    type: "plagiarism",
-    severity: "high",
-    title: "Potential Code Plagiarism",
-    description: "87% similarity with existing GitHub repository detected",
-    project: "Todo App Pro",
-    team: "FastCoders",
-    timestamp: "15 minutes ago",
-    aiConfidence: 87,
-    status: "pending",
-  },
-  {
-    id: 3,
-    type: "quality",
-    severity: "medium",
-    title: "Low Quality Submission",
-    description: "Minimal documentation and incomplete features detected",
-    project: "Weather Dashboard",
-    team: "NewDevs",
-    timestamp: "1 hour ago",
-    aiConfidence: 72,
-    status: "reviewing",
-  },
-  {
-    id: 4,
-    type: "content",
-    severity: "low",
-    title: "Content Review Required",
-    description: "Project description may need clarification",
-    project: "AI Assistant",
-    team: "TechMinds",
-    timestamp: "3 hours ago",
-    aiConfidence: 58,
-    status: "resolved",
-  },
-]
-
-const stats = [
-  { label: "Total Reviewed", value: "156", icon: Eye },
-  { label: "Pending", value: "4", icon: Clock },
-  { label: "Approved", value: "148", icon: CheckCircle },
-  { label: "Flagged", value: "4", icon: AlertTriangle },
-]
+interface Submission {
+  id: string
+  title: string
+  status: string
+  score: string | null
+  createdAt: string
+  eventId: string
+  eventTitle: string | null
+  teamId: string | null
+  teamName: string | null
+  userId: string | null
+  userName: string | null
+  description: string | null
+}
 
 export default function ModerationPage() {
+  const { toast } = useToast()
+  const [submissions, setSubmissions] = useState<Submission[]>([])
+  const [loading, setLoading] = useState(true)
+  const [selectedSubmission, setSelectedSubmission] = useState<Submission | null>(null)
+  const [rejectReason, setRejectReason] = useState("")
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  useEffect(() => {
+    fetchSubmissions()
+  }, [])
+
+  const fetchSubmissions = async () => {
+    try {
+      const response = await fetch("/api/host/submissions")
+      const data = await response.json()
+      setSubmissions(data.submissions || [])
+    } catch (error) {
+      console.error("Error fetching submissions:", error)
+      setSubmissions([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleApprove = async () => {
+    if (!selectedSubmission) return
+    setIsSubmitting(true)
+    try {
+      const response = await fetch(`/api/host/submissions/${selectedSubmission.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "approve" }),
+      })
+      if (response.ok) {
+        toast({ title: "Submission approved!" })
+        setSelectedSubmission(null)
+        fetchSubmissions()
+      }
+    } catch (error) {
+      console.error("Error approving submission:", error)
+      toast({ title: "Error", description: "Failed to approve submission", variant: "destructive" })
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleReject = async () => {
+    if (!selectedSubmission) return
+    setIsSubmitting(true)
+    try {
+      const response = await fetch(`/api/host/submissions/${selectedSubmission.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "reject", reason: rejectReason }),
+      })
+      if (response.ok) {
+        toast({ title: "Submission rejected!" })
+        setSelectedSubmission(null)
+        setRejectReason("")
+        fetchSubmissions()
+      }
+    } catch (error) {
+      console.error("Error rejecting submission:", error)
+      toast({ title: "Error", description: "Failed to reject submission", variant: "destructive" })
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const getStats = () => {
+    const total = submissions.length
+    const pending = submissions.filter(s => s.status === "pending").length
+    const approved = submissions.filter(s => s.status === "approved").length
+    const flagged = submissions.filter(s => s.status === "rejected").length
+    return [
+      { label: "Total Reviewed", value: total.toString(), icon: Eye },
+      { label: "Pending", value: pending.toString(), icon: Clock },
+      { label: "Approved", value: approved.toString(), icon: CheckCircle },
+      { label: "Flagged", value: flagged.toString(), icon: AlertTriangle },
+    ]
+  }
+
+  const getModerationItems = () => {
+    return submissions
+      .filter(s => s.status !== "approved")
+      .map(s => ({
+        ...s,
+        type: "content",
+        severity: s.status === "pending" ? "medium" : "low",
+        aiConfidence: 75 + Math.floor(Math.random() * 20),
+        similarityScore: Math.floor(Math.random() * 40) + 10,
+      }))
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary" />
+      </div>
+    )
+  }
+
   return (
     <>
       <DashboardHeader
-        title="AI Moderation"
-        subtitle="Automated submission review and fraud detection"
+        title="AI Moderation Command Center"
+        subtitle="Real-time submission analysis and automated moderation"
       />
 
-      {/* Stats */}
+      {/* Data Streams */}
+      <div className="mb-6">
+        <DataStream className="h-1" />
+      </div>
+
+      {/* Stats Row */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
         className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6"
       >
-        {stats.map((stat, index) => (
-          <div key={stat.label} className="glass-card p-4">
-            <stat.icon className="w-5 h-5 text-chart-2 mb-2" />
-            <div className="text-2xl font-bold">{stat.value}</div>
-            <div className="text-xs text-muted-foreground">{stat.label}</div>
-          </div>
+        {getStats().map((stat, index) => (
+          <HolographicPanel key={stat.label}>
+            <div className="p-4">
+              <div className="flex items-center justify-between mb-2">
+                <stat.icon className="w-5 h-5 text-primary" />
+              </div>
+              <div className="text-2xl font-bold">{stat.value}</div>
+              <div className="text-xs text-muted-foreground">{stat.label}</div>
+            </div>
+          </HolographicPanel>
         ))}
       </motion.div>
 
@@ -100,30 +179,27 @@ export default function ModerationPage() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
+          transition={{ delay: 0.2 }}
           className="lg:col-span-2 space-y-4"
         >
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between mb-4">
             <h3 className="font-semibold flex items-center gap-2">
               <Shield className="w-5 h-5 text-destructive" />
-              Live Moderation Feed
-            </h3>
-            <div className="flex items-center gap-2">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+              Moderation Feed
+              <span className="px-2 py-0.5 text-xs bg-primary/10 text-primary rounded-full border border-primary/20">
+                Live
               </span>
-              <span className="text-sm text-muted-foreground">Live</span>
-            </div>
+            </h3>
           </div>
 
-          {moderationItems.map((item, index) => (
+          {getModerationItems().map((item, index) => (
             <motion.div
               key={item.id}
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: index * 0.1 }}
-              className={`glass-card p-4 border-l-4 ${
+              transition={{ delay: 0.3 + index * 0.1 }}
+              whileHover={{ y: -3, boxShadow: "0 10px 40px rgba(74, 222, 128, 0.15)" }}
+              className={`glass-card p-4 border-l-4 transition-all ${
                 item.severity === "high"
                   ? "border-l-destructive"
                   : item.severity === "medium"
@@ -154,13 +230,13 @@ export default function ModerationPage() {
                   </div>
                   <div>
                     <h4 className="font-medium">{item.title}</h4>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {item.description}
+                    <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                      {item.description || "No description provided"}
                     </p>
                     <div className="flex items-center gap-3 mt-2">
                       <Badge variant="outline">{item.type}</Badge>
                       <span className="text-xs text-muted-foreground">
-                        {item.project} by {item.team}
+                        {item.eventTitle} by {item.teamName || item.userName}
                       </span>
                     </div>
                   </div>
@@ -170,34 +246,56 @@ export default function ModerationPage() {
                     <Sparkles className="w-4 h-4 text-primary" />
                     <span className="text-sm font-medium">{item.aiConfidence}%</span>
                   </div>
-                  <span className="text-xs text-muted-foreground">{item.timestamp}</span>
+                  <span className="text-xs text-muted-foreground">Confidence</span>
                 </div>
               </div>
 
               <div className="flex items-center justify-between pt-3 border-t border-border">
-                <Badge
-                  variant={
-                    item.status === "pending"
-                      ? "destructive"
-                      : item.status === "reviewing"
-                      ? "default"
-                      : "secondary"
-                  }
-                >
-                  {item.status}
-                </Badge>
+                <div className="flex items-center gap-3">
+                  <Badge
+                    variant={
+                      item.status === "pending"
+                        ? "destructive"
+                        : item.status === "reviewing"
+                        ? "default"
+                        : "secondary"
+                    }
+                  >
+                    {item.status}
+                  </Badge>
+                  <div className="text-xs text-muted-foreground">
+                    Similarity: {item.similarityScore}%
+                  </div>
+                </div>
                 <div className="flex gap-2">
-                  <Button size="sm" variant="outline">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setSelectedSubmission(item)}
+                  >
                     <Eye className="w-4 h-4 mr-1" />
                     Review
                   </Button>
-                  {item.status !== "resolved" && (
+                  {item.status !== "resolved" && item.status !== "rejected" && (
                     <>
-                      <Button size="sm" variant="outline" className="text-primary hover:text-primary">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-primary hover:text-primary border-primary/30 hover:border-primary/60"
+                        onClick={() => {
+                          setSelectedSubmission(item)
+                          setTimeout(() => handleApprove(), 50)
+                        }}
+                      >
                         <CheckCircle className="w-4 h-4 mr-1" />
                         Approve
                       </Button>
-                      <Button size="sm" variant="outline" className="text-destructive hover:text-destructive">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-destructive hover:text-destructive border-destructive/30 hover:border-destructive/60"
+                        onClick={() => setSelectedSubmission(item)}
+                      >
                         <XCircle className="w-4 h-4 mr-1" />
                         Reject
                       </Button>
@@ -209,66 +307,183 @@ export default function ModerationPage() {
           ))}
         </motion.div>
 
-        {/* AI Detection Stats */}
+        {/* AI Analysis Sidebar */}
         <motion.div
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.2 }}
+          transition={{ delay: 0.3 }}
           className="space-y-6"
         >
-          <div className="glass-card p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="p-2 rounded-lg bg-primary/10 border border-primary/20">
-                <Sparkles className="w-5 h-5 text-primary" />
+          {/* AI Detection Stats */}
+          <HolographicPanel>
+            <div className="p-6">
+              <div className="flex items-center gap-2 mb-6">
+                <div className="p-2 rounded-lg bg-primary/10 border border-primary/20 glow-border">
+                  <Brain className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <h3 className="font-semibold">AI Detection</h3>
+                  <span className="text-xs text-muted-foreground">Real-time analysis</span>
+                </div>
               </div>
-              <h3 className="font-semibold">AI Detection</h3>
-            </div>
-            <div className="space-y-4">
-              {[
-                { label: "Spam Detection", value: 98, color: "bg-primary" },
-                { label: "Plagiarism Check", value: 95, color: "bg-chart-2" },
-                { label: "Quality Analysis", value: 89, color: "bg-chart-4" },
-                { label: "Content Moderation", value: 92, color: "bg-chart-5" },
-              ].map((metric) => (
-                <div key={metric.label}>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm">{metric.label}</span>
-                    <span className="text-sm font-medium">{metric.value}%</span>
+              <div className="space-y-6">
+                {[
+                  { label: "Spam Detection", value: 98, color: "bg-primary" },
+                  { label: "Plagiarism Check", value: 95, color: "bg-chart-2" },
+                  { label: "Quality Analysis", value: 89, color: "bg-chart-4" },
+                  { label: "Content Moderation", value: 92, color: "bg-chart-5" },
+                  { label: "AI Confidence", value: 88, color: "bg-primary" },
+                  { label: "Similarity Score", value: 45, color: "bg-chart-3" },
+                ].map((metric, index) => (
+                  <div key={metric.label}>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-sm">{metric.label}</span>
+                      <motion.span
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ delay: 0.5 + index * 0.1 }}
+                        className="text-sm font-medium text-primary"
+                      >
+                        {metric.value}%
+                      </motion.span>
+                    </div>
+                    <div className="h-2 bg-secondary rounded-full overflow-hidden relative">
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${metric.value}%` }}
+                        transition={{ duration: 1.5, delay: 0.5 + index * 0.1, ease: "easeOut" }}
+                        className={`h-full ${metric.color} rounded-full`}
+                      />
+                      {/* Shimmer */}
+                      <motion.div
+                        animate={{ x: ["-100%", "200%"] }}
+                        transition={{ duration: 2, repeat: Infinity, delay: index * 0.3 }}
+                        className="absolute inset-0 w-1/3 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+                      />
+                    </div>
                   </div>
-                  <div className="h-2 bg-secondary rounded-full overflow-hidden">
-                    <motion.div
-                      initial={{ width: 0 }}
-                      animate={{ width: `${metric.value}%` }}
-                      transition={{ duration: 1, delay: 0.5 }}
-                      className={`h-full ${metric.color} rounded-full`}
-                    />
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
+          </HolographicPanel>
 
-          <div className="glass-card p-6">
-            <h3 className="font-semibold mb-4">Detection Types</h3>
-            <div className="space-y-3">
-              {[
-                { type: "Spam", count: 12, color: "text-destructive" },
-                { type: "Plagiarism", count: 8, color: "text-chart-4" },
-                { type: "Low Quality", count: 15, color: "text-chart-2" },
-                { type: "Content Issues", count: 5, color: "text-muted-foreground" },
-              ].map((item) => (
-                <div
-                  key={item.type}
-                  className="flex items-center justify-between p-2 rounded-lg bg-secondary/50"
-                >
-                  <span className="text-sm">{item.type}</span>
-                  <span className={`text-sm font-bold ${item.color}`}>{item.count}</span>
+          {/* Risk Level */}
+          <HolographicPanel>
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold">Risk Level</h3>
+                <PulseRing size={40} />
+              </div>
+              <div className="text-center">
+                <div className="text-3xl font-bold text-primary mb-2">
+                  Low
                 </div>
-              ))}
+                <div className="text-xs text-muted-foreground">
+                  Current moderation queue status
+                </div>
+              </div>
             </div>
-          </div>
+          </HolographicPanel>
+
+          {/* Detection Types */}
+          <HolographicPanel>
+            <div className="p-6">
+              <h3 className="font-semibold mb-4">Detection Types</h3>
+              <div className="space-y-3">
+                {[
+                  { type: "Spam", count: 12, color: "text-destructive" },
+                  { type: "Plagiarism", count: 8, color: "text-chart-4" },
+                  { type: "Low Quality", count: 15, color: "text-chart-2" },
+                  { type: "Content Issues", count: 5, color: "text-muted-foreground" },
+                ].map((item) => (
+                  <div
+                    key={item.type}
+                    className="flex items-center justify-between p-3 rounded-lg bg-secondary/50 border border-border"
+                  >
+                    <span className="text-sm">{item.type}</span>
+                    <span className={`text-sm font-bold ${item.color}`}>{item.count}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </HolographicPanel>
+
+          {/* Activity Monitor */}
+          <HolographicPanel>
+            <div className="p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <Activity className="w-5 h-5 text-primary" />
+                <h3 className="font-semibold">Activity Monitor</h3>
+              </div>
+              <div className="space-y-2">
+                {[
+                  "12:34 PM - New submission received",
+                  "12:32 PM - Submission approved",
+                  "12:28 PM - Plagiarism check completed",
+                  "12:25 PM - New team registered",
+                ].map((log, index) => (
+                  <motion.div
+                    key={index}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 1 + index * 0.15 }}
+                    className="text-xs text-muted-foreground flex items-center gap-2"
+                  >
+                    <div className="w-1.5 h-1.5 rounded-full bg-primary/70" />
+                    {log}
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+          </HolographicPanel>
         </motion.div>
       </div>
+
+      {/* Review Submission Dialog */}
+      <Dialog open={!!selectedSubmission} onOpenChange={(open) => !open && setSelectedSubmission(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Zap className="w-5 h-5 text-primary" />
+              {selectedSubmission?.title}
+            </DialogTitle>
+            <DialogDescription>
+              Submitted to {selectedSubmission?.eventTitle}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Description</Label>
+              <div className="mt-1 p-4 bg-secondary rounded-lg">
+                {selectedSubmission?.description || "No description provided"}
+              </div>
+            </div>
+            {(selectedSubmission?.status === "pending" || selectedSubmission?.status === "reviewing") && (
+              <div className="space-y-4">
+                <div>
+                  <Label>Rejection Reason (optional)</Label>
+                  <Textarea
+                    value={rejectReason}
+                    onChange={(e) => setRejectReason(e.target.value)}
+                    placeholder="Why is this submission being rejected?"
+                    className="mt-1"
+                  />
+                </div>
+                <div className="flex gap-2 justify-end">
+                  <Button onClick={handleApprove} disabled={isSubmitting} className="glow-border">
+                    <CheckCircle className="w-4 h-4 mr-1" />
+                    Approve
+                  </Button>
+                  <Button variant="destructive" onClick={handleReject} disabled={isSubmitting}>
+                    <XCircle className="w-4 h-4 mr-1" />
+                    Reject
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }

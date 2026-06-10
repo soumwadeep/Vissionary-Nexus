@@ -71,7 +71,7 @@ function NFTBadgeCard({ badge }: { badge: NFTBadge }) {
 
   return (
     <motion.div
-      className="relative group"
+      className="relative group min-w-0"
       whileHover={{ scale: 1.05, y: -5 }}
       transition={{ type: "spring", stiffness: 300 }}
     >
@@ -85,7 +85,7 @@ function NFTBadgeCard({ badge }: { badge: NFTBadge }) {
 
       {/* Card */}
       <div
-        className={`relative p-4 rounded-xl border-2 transition-all duration-300 ${
+        className={`relative p-4 rounded-xl border-2 transition-all duration-300 min-w-0 h-full ${
           badge.earned ? "bg-card/80" : "bg-card/30 opacity-50"
         }`}
         style={{
@@ -116,17 +116,17 @@ function NFTBadgeCard({ badge }: { badge: NFTBadge }) {
         </motion.div>
 
         {/* Info */}
-        <h4 className="font-semibold text-sm text-center mb-1">{badge.name}</h4>
-        <p className="text-xs text-muted-foreground text-center mb-2">{badge.description}</p>
+        <h4 className="font-semibold text-sm text-center mb-1 break-words">{badge.name}</h4>
+        <p className="text-xs text-muted-foreground text-center mb-2 break-words">{badge.description}</p>
 
         {/* Status */}
         {badge.earned ? (
-          <div className="flex items-center justify-center gap-1 text-xs" style={{ color: colors.border }}>
+          <div className="flex items-center justify-center gap-1 text-xs flex-wrap text-center" style={{ color: colors.border }}>
             <Award className="w-3 h-3" />
             <span>Earned {badge.earnedDate}</span>
           </div>
         ) : (
-          <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
+          <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground flex-wrap text-center">
             <Zap className="w-3 h-3" />
             <span>Locked</span>
           </div>
@@ -154,8 +154,8 @@ export function NFTAchievementShowcase() {
   const earnedCount = nftBadges.filter((b) => b.earned).length
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 min-w-0">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h3 className="text-lg font-semibold">NFT Achievements</h3>
           <p className="text-sm text-muted-foreground">
@@ -168,10 +168,11 @@ export function NFTAchievementShowcase() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5 gap-4 min-w-0">
         {nftBadges.map((badge, index) => (
           <motion.div
             key={badge.id}
+            className="min-w-0"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.1 }}

@@ -1,8 +1,8 @@
-"use server";
+'use server'
 
-import { db } from "@/lib/db";
-import { users, onboardingStatus } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { db } from '@/lib/db'
+import { users, onboardingStatus, aiGoalHistory } from '@/db/schema'
+import { eq, desc } from 'drizzle-orm'
 
 /**
  * Sync or create a user wallet profile in the database
@@ -11,7 +11,7 @@ import { eq } from "drizzle-orm";
 export async function syncWalletProfile(
   walletAddress: string,
   email?: string,
-  name?: string,
+  name?: string
 ) {
   try {
     // Check if user exists by wallet address
@@ -19,14 +19,14 @@ export async function syncWalletProfile(
       .select()
       .from(users)
       .where(eq(users.walletAddress, walletAddress))
-      .limit(1);
+      .limit(1)
 
     if (existingUser.length > 0) {
       return {
         success: true,
         user: existingUser[0],
         isNew: false,
-      };
+      }
     }
 
     // Create new user with wallet
@@ -36,28 +36,28 @@ export async function syncWalletProfile(
         walletAddress,
         email: email || `wallet-${walletAddress.slice(0, 6)}@nexus.local`,
         name: name || `User ${walletAddress.slice(0, 6)}`,
-        role: "member",
+        role: 'member',
         reputation: 0,
       })
-      .returning();
+      .returning()
 
     // Create onboarding status record
     await db.insert(onboardingStatus).values({
       userId: newUser[0].id,
       walletConnected: true,
-    });
+    })
 
     return {
       success: true,
       user: newUser[0],
       isNew: true,
-    };
+    }
   } catch (error) {
-    console.error("syncWalletProfile error:", error);
+    console.error('[v0] syncWalletProfile error:', error)
     return {
       success: false,
-      error: "Failed to sync wallet profile",
-    };
+      error: 'Failed to sync wallet profile',
+    }
   }
 }
 
@@ -70,12 +70,12 @@ export async function getUserByWallet(walletAddress: string) {
       .select()
       .from(users)
       .where(eq(users.walletAddress, walletAddress))
-      .limit(1);
+      .limit(1)
 
-    return user.length > 0 ? user[0] : null;
+    return user.length > 0 ? user[0] : null
   } catch (error) {
-    console.error("getUserByWallet error:", error);
-    return null;
+    console.error('[v0] getUserByWallet error:', error)
+    return null
   }
 }
 
@@ -85,11 +85,11 @@ export async function getUserByWallet(walletAddress: string) {
 export async function updateUserProfile(
   userId: string,
   data: {
-    name?: string;
-    bio?: string;
-    avatar?: string;
-    role?: string;
-  },
+    name?: string
+    bio?: string
+    avatar?: string
+    role?: string
+  }
 ) {
   try {
     const updated = await db
@@ -99,18 +99,18 @@ export async function updateUserProfile(
         updatedAt: new Date(),
       })
       .where(eq(users.id, userId))
-      .returning();
+      .returning()
 
     return {
       success: true,
       user: updated[0],
-    };
+    }
   } catch (error) {
-    console.error("updateUserProfile error:", error);
+    console.error('[v0] updateUserProfile error:', error)
     return {
       success: false,
-      error: "Failed to update profile",
-    };
+      error: 'Failed to update profile',
+    }
   }
 }
 
@@ -120,39 +120,39 @@ export async function updateUserProfile(
 export async function updateOnboardingStatus(
   userId: string,
   updates: {
-    roleSelected?: boolean;
-    profileCompleted?: boolean;
-    aiInitialized?: boolean;
-    onboardingComplete?: boolean;
-  },
+    roleSelected?: boolean
+    profileCompleted?: boolean
+    aiInitialized?: boolean
+    onboardingComplete?: boolean
+  }
 ) {
   try {
     const statusUpdates: any = {
       ...updates,
       updatedAt: new Date(),
-    };
+    }
 
     // If onboarding is complete, set completedAt
     if (updates.onboardingComplete) {
-      statusUpdates.completedAt = new Date();
+      statusUpdates.completedAt = new Date()
     }
 
     const updated = await db
       .update(onboardingStatus)
       .set(statusUpdates)
       .where(eq(onboardingStatus.userId, userId))
-      .returning();
+      .returning()
 
     return {
       success: true,
       status: updated[0],
-    };
+    }
   } catch (error) {
-    console.error("updateOnboardingStatus error:", error);
+    console.error('[v0] updateOnboardingStatus error:', error)
     return {
       success: false,
-      error: "Failed to update onboarding status",
-    };
+      error: 'Failed to update onboarding status',
+    }
   }
 }
 
@@ -165,11 +165,135 @@ export async function getOnboardingStatus(userId: string) {
       .select()
       .from(onboardingStatus)
       .where(eq(onboardingStatus.userId, userId))
-      .limit(1);
+      .limit(1)
 
-    return status.length > 0 ? status[0] : null;
+    return status.length > 0 ? status[0] : null
   } catch (error) {
-    console.error("getOnboardingStatus error:", error);
-    return null;
+    console.error('[v0] getOnboardingStatus error:', error)
+    return null
+  }
+}
+
+/**
+ * Save goal to AI goal history
+ */
+export async function saveGoalHistory(
+  userId: string,
+  goal: string,
+  goalType: string,
+  generatedRoadmap: any,
+  recommendations: any[],
+  progress: any
+) {
+  try {
+    const result = await db
+      .insert(aiGoalHistory)
+      .values({
+        userId,
+        goal,
+        goalType,
+        generatedRoadmap,
+        recommendations,
+        progress,
+        status: 'active'
+      })
+      .returning()
+
+    return {
+      success: true,
+      goalHistory: result[0]
+    }
+  } catch (error) {
+    console.error('[v0] saveGoalHistory error:', error)
+    return {
+      success: false,
+      error: 'Failed to save goal history'
+    }
+  }
+}
+
+/**
+ * Get user's active goal history
+ */
+export async function getActiveGoals(userId: string) {
+  try {
+    const goals = await db
+      .select()
+      .from(aiGoalHistory)
+      .where(eq(aiGoalHistory.userId, userId))
+      .orderBy(desc(aiGoalHistory.createdAt))
+      .limit(5)
+
+    return goals
+  } catch (error) {
+    console.error('[v0] getActiveGoals error:', error)
+    return []
+  }
+}
+
+/**
+ * Update goal progress
+ */
+export async function updateGoalProgress(
+  goalId: string,
+  progress: any
+) {
+  try {
+    const result = await db
+      .update(aiGoalHistory)
+      .set({
+        progress,
+        updatedAt: new Date()
+      })
+      .where(eq(aiGoalHistory.id, goalId))
+      .returning()
+
+    return {
+      success: true,
+      goalHistory: result[0]
+    }
+  } catch (error) {
+    console.error('[v0] updateGoalProgress error:', error)
+    return {
+      success: false,
+      error: 'Failed to update goal progress'
+    }
+  }
+}
+
+/**
+ * Update entire goal history record
+ */
+export async function updateGoalHistory(
+  goalId: string,
+  data: Partial<{
+    goal?: string;
+    goalType?: string;
+    generatedRoadmap?: any;
+    recommendations?: any[];
+    progress?: any;
+    status?: string;
+  }>
+) {
+  try {
+    const result = await db
+      .update(aiGoalHistory)
+      .set({
+        ...data,
+        updatedAt: new Date(),
+      })
+      .where(eq(aiGoalHistory.id, goalId))
+      .returning()
+
+    return {
+      success: true,
+      goalHistory: result[0],
+    }
+  } catch (error) {
+    console.error('[v0] updateGoalHistory error:', error)
+    return {
+      success: false,
+      error: 'Failed to update goal history',
+    }
   }
 }

@@ -4,66 +4,33 @@ import { motion, AnimatePresence } from "framer-motion"
 import { DashboardHeader } from "@/components/dashboard/dashboard-header"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Users, Sparkles, Star, Code, Palette, Database, Brain, MessageSquare, Scan, Zap, Activity, Network } from "lucide-react"
+import { Users, Sparkles, Star, Code, Palette, Database, Brain, MessageSquare, Scan, Zap, Activity, Network, X, Send, Check, Plus } from "lucide-react"
 import { useState, useEffect } from "react"
 import { HolographicPanel } from "@/components/ecosystem/micro-interactions"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
+import { Textarea } from "@/components/ui/textarea"
+import { useToast } from "@/hooks/use-toast"
+import { analyticsEvents } from "@/lib/analytics"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { useAuth } from "@/hooks/use-auth"
 
-const recommendedTeammates = [
-  {
-    id: 1,
-    name: "Sarah Chen",
-    avatar: "SC",
-    role: "Frontend Developer",
-    skills: ["React", "TypeScript", "Tailwind"],
-    compatibility: 94,
-    status: "online",
-  },
-  {
-    id: 2,
-    name: "Mike Johnson",
-    avatar: "MJ",
-    role: "Backend Developer",
-    skills: ["Node.js", "Python", "PostgreSQL"],
-    compatibility: 89,
-    status: "online",
-  },
-  {
-    id: 3,
-    name: "Elena Rodriguez",
-    avatar: "ER",
-    role: "UI/UX Designer",
-    skills: ["Figma", "User Research", "Prototyping"],
-    compatibility: 87,
-    status: "away",
-  },
-  {
-    id: 4,
-    name: "David Kim",
-    avatar: "DK",
-    role: "ML Engineer",
-    skills: ["PyTorch", "TensorFlow", "Computer Vision"],
-    compatibility: 85,
-    status: "online",
-  },
-  {
-    id: 5,
-    name: "Lisa Wang",
-    avatar: "LW",
-    role: "DevOps Engineer",
-    skills: ["AWS", "Docker", "Kubernetes"],
-    compatibility: 82,
-    status: "offline",
-  },
-  {
-    id: 6,
-    name: "James Brown",
-    avatar: "JB",
-    role: "Product Manager",
-    skills: ["Strategy", "Agile", "Analytics"],
-    compatibility: 78,
-    status: "online",
-  },
-]
+interface RecommendedTeammate {
+  id: string | number
+  name: string
+  avatar: string
+  role: string
+  skills: string[]
+  compatibility: number
+  status: string
+  aiAnalysis?: {
+    compatibilityExplanation: string
+    suggestedTeamStructure: string
+    collaborationStrengths: string[]
+    potentialRisks: string[]
+    teamSuccessPrediction: string
+  } | null
+}
 
 const skillFilters = [
   { icon: Code, label: "Development" },
@@ -85,8 +52,136 @@ export default function TeamMatchPage() {
   const [isMatching, setIsMatching] = useState(false)
   const [matchingStep, setMatchingStep] = useState(0)
   const [showResults, setShowResults] = useState(true)
-  const [scanningId, setScanningId] = useState<number | null>(null)
+  const [scanningId, setScanningId] = useState<string | number | null>(null)
   const [networkPulse, setNetworkPulse] = useState(false)
+  const [messageDialogOpen, setMessageDialogOpen] = useState(false)
+  const [inviteDialogOpen, setInviteDialogOpen] = useState(false)
+  const [selectedTeammate, setSelectedTeammate] = useState<RecommendedTeammate | null>(null)
+  const [messageText, setMessageText] = useState("")
+  const [invitedIds, setInvitedIds] = useState<(string | number)[]>([])
+  const [sendingMessage, setSendingMessage] = useState(false)
+  const [sendingInvite, setSendingInvite] = useState(false)
+  const [createTeamDialogOpen, setCreateTeamDialogOpen] = useState(false)
+  const [newTeamName, setNewTeamName] = useState("")
+  const [isCreatingTeam, setIsCreatingTeam] = useState(false)
+  const [recommendedTeammates, setRecommendedTeammates] = useState<RecommendedTeammate[]>([])
+  const [isLoadingTeammates, setIsLoadingTeammates] = useState(true)
+  const [expandedAnalysisId, setExpandedAnalysisId] = useState<string | number | null>(null)
+  const { toast } = useToast()
+  const { session } = useAuth()
+
+  // Fetch recommendations from API
+  const fetchRecommendations = async () => {
+    if (!session?.user?.id) return
+    try {
+      setIsLoadingTeammates(true)
+      const response = await fetch("/api/team-match/recommendations")
+      
+      if (!response.ok) {
+        console.warn("API request failed, using mock data")
+        // Fallback to mock data
+        const mockTeammates = [
+          { id: '1', name: 'Sarah Chen', avatar: 'SC', role: 'Frontend Developer', skills: ['React', 'TypeScript', 'Tailwind'], compatibility: 94, status: 'online' },
+          { id: '2', name: 'Mike Johnson', avatar: 'MJ', role: 'Backend Developer', skills: ['Node.js', 'Python', 'PostgreSQL'], compatibility: 89, status: 'online' },
+          { id: '3', name: 'Elena Rodriguez', avatar: 'ER', role: 'UI/UX Designer', skills: ['Figma', 'User Research', 'Prototyping'], compatibility: 87, status: 'away' },
+          { id: '4', name: 'David Kim', avatar: 'DK', role: 'AI/ML Engineer', skills: ['PyTorch', 'TensorFlow', 'Computer Vision'], compatibility: 85, status: 'online' },
+        ]
+        setRecommendedTeammates(mockTeammates)
+        return
+      }
+
+      const data = await response.json()
+      setRecommendedTeammates(data.recommendations || [])
+      
+      // Fire analytics event if we have valid data
+      if (data.recommendations && data.recommendations.length > 0) {
+        const scores = data.recommendations.map((t: RecommendedTeammate) => t.compatibility)
+        const minScore = Math.min(...scores)
+        const maxScore = Math.max(...scores)
+        analyticsEvents.teamMatchGenerated(data.recommendations.length, minScore, maxScore)
+        analyticsEvents.aiMatchGenerated(data.recommendations.length, minScore, maxScore)
+      }
+    } catch (err) {
+      console.error("Failed to fetch recommendations:", err)
+      // Fallback to default data
+      const mockTeammates = [
+        { id: '1', name: 'Sarah Chen', avatar: 'SC', role: 'Frontend Developer', skills: ['React', 'TypeScript', 'Tailwind'], compatibility: 94, status: 'online' },
+        { id: '2', name: 'Mike Johnson', avatar: 'MJ', role: 'Backend Developer', skills: ['Node.js', 'Python', 'PostgreSQL'], compatibility: 89, status: 'online' },
+        { id: '3', name: 'Elena Rodriguez', avatar: 'ER', role: 'UI/UX Designer', skills: ['Figma', 'User Research', 'Prototyping'], compatibility: 87, status: 'away' },
+      ]
+      setRecommendedTeammates(mockTeammates)
+    } finally {
+      setIsLoadingTeammates(false)
+    }
+  }
+
+  // Initial load
+  useEffect(() => {
+    fetchRecommendations()
+  }, [session?.user?.id])
+
+  const handleMessage = (teammate: RecommendedTeammate) => {
+    setSelectedTeammate(teammate)
+    setMessageText("")
+    setMessageDialogOpen(true)
+  }
+
+  const handleInvite = (teammate: RecommendedTeammate) => {
+    setSelectedTeammate(teammate)
+    setInviteDialogOpen(true)
+  }
+
+  const sendMessage = async () => {
+    if (!selectedTeammate || !messageText.trim()) return
+    setSendingMessage(true)
+    // Simulate API call
+    await new Promise(resolve => setTimeout(resolve, 1000))
+    setSendingMessage(false)
+    setMessageDialogOpen(false)
+    toast({
+      title: "Message Sent",
+      description: `Your message has been sent to ${selectedTeammate.name}.`,
+    })
+  }
+
+  const confirmInvite = async () => {
+    if (!selectedTeammate) return
+    setSendingInvite(true)
+    // Simulate API call
+    await new Promise(resolve => setTimeout(resolve, 1000))
+    
+    // Fire analytics event
+    analyticsEvents.teamInviteSent(String(selectedTeammate.id), selectedTeammate.name)
+    
+    setSendingInvite(false)
+    setInvitedIds(prev => [...prev, selectedTeammate.id])
+    setInviteDialogOpen(false)
+    toast({
+      title: "Invitation Sent",
+      description: `Team invitation sent to ${selectedTeammate.name}. You'll be notified when they respond.`,
+    })
+  }
+
+  const handleCreateTeam = async () => {
+    if (!newTeamName.trim()) {
+      toast({
+        title: "Missing Team Name",
+        description: "Please enter a name for your team.",
+        variant: "destructive",
+      })
+      return
+    }
+    setIsCreatingTeam(true)
+    await new Promise(resolve => setTimeout(resolve, 1500))
+    analyticsEvents.teamCreated(newTeamName, "participant")
+    setIsCreatingTeam(false)
+    setCreateTeamDialogOpen(false)
+    setNewTeamName("")
+    toast({
+      title: "Team Created!",
+      description: `Team "${newTeamName}" has been created successfully.`,
+    })
+  }
 
   const toggleSkill = (skill: string) => {
     setSelectedSkills((prev) =>
@@ -104,6 +199,9 @@ export default function TeamMatchPage() {
       await new Promise((resolve) => setTimeout(resolve, matchingSteps[i].duration))
     }
 
+    // Refresh recommendations
+    await fetchRecommendations()
+
     setIsMatching(false)
     setShowResults(true)
     setNetworkPulse(true)
@@ -112,19 +210,45 @@ export default function TeamMatchPage() {
 
   // Simulate periodic scanning
   useEffect(() => {
+    if (recommendedTeammates.length === 0) return
+    
     const interval = setInterval(() => {
-      setScanningId(Math.floor(Math.random() * recommendedTeammates.length) + 1)
+      const randomIndex = Math.floor(Math.random() * recommendedTeammates.length)
+      setScanningId(recommendedTeammates[randomIndex].id)
       setTimeout(() => setScanningId(null), 1000)
     }, 5000)
     return () => clearInterval(interval)
-  }, [])
+  }, [recommendedTeammates])
+
+  if (isLoadingTeammates) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-12 h-12 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading recommendations...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <>
       <DashboardHeader
         title="AI Team Match"
-        subtitle="Find your perfect teammates with AI-powered matching"
+        subtitle="Find your perfect hackathon teammates with AI-powered matching"
       />
+
+      {/* Quick Actions */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex gap-4 mb-6"
+      >
+        <Button className="gap-2" onClick={() => setCreateTeamDialogOpen(true)}>
+          <Plus className="w-4 h-4" />
+          Create Team
+        </Button>
+      </motion.div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Matching Controls */}
@@ -390,14 +514,122 @@ export default function TeamMatchPage() {
                         />
                       </div>
 
+                      {/* AI Analysis Panel */}
+                      {teammate.aiAnalysis && (
+                        <div className="mt-4">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full text-xs gap-1"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              const newExpandedId = expandedAnalysisId === teammate.id ? null : teammate.id
+                              setExpandedAnalysisId(newExpandedId)
+                              if (newExpandedId) {
+                                analyticsEvents.aiAnalysisViewed(String(teammate.id), teammate.compatibility)
+                              }
+                            }}
+                          >
+                            <Brain className="w-3 h-3" />
+                            {expandedAnalysisId === teammate.id ? "Hide AI Analysis" : "Show AI Analysis"}
+                          </Button>
+
+                          <AnimatePresence>
+                            {expandedAnalysisId === teammate.id && (
+                              <motion.div
+                                initial={{ opacity: 0, height: 0 }}
+                                animate={{ opacity: 1, height: "auto" }}
+                                exit={{ opacity: 0, height: 0 }}
+                                className="mt-3 space-y-3 overflow-hidden"
+                              >
+                                <div className="bg-primary/5 border border-primary/20 rounded-lg p-3">
+                                  <h5 className="text-sm font-semibold text-primary mb-2 flex items-center gap-1">
+                                    <Sparkles className="w-3 h-3" />
+                                    Compatibility Explanation
+                                  </h5>
+                                  <p className="text-xs text-muted-foreground">
+                                    {teammate.aiAnalysis.compatibilityExplanation}
+                                  </p>
+                                </div>
+
+                                <div className="bg-secondary/30 rounded-lg p-3">
+                                  <h5 className="text-sm font-semibold mb-2">Suggested Team Structure</h5>
+                                  <p className="text-xs text-muted-foreground">
+                                    {teammate.aiAnalysis.suggestedTeamStructure}
+                                  </p>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                  <div className="bg-secondary/30 rounded-lg p-3">
+                                    <h5 className="text-sm font-semibold mb-2 flex items-center gap-1">
+                                      <Star className="w-3 h-3 text-primary" />
+                                      Collaboration Strengths
+                                    </h5>
+                                    <ul className="text-xs text-muted-foreground space-y-1">
+                                      {teammate.aiAnalysis.collaborationStrengths.map((strength, i) => (
+                                        <li key={i} className="flex items-start gap-1">
+                                          <span className="text-primary mt-1">•</span>
+                                          {strength}
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </div>
+
+                                  <div className="bg-secondary/30 rounded-lg p-3">
+                                    <h5 className="text-sm font-semibold mb-2">Potential Risks</h5>
+                                    <ul className="text-xs text-muted-foreground space-y-1">
+                                      {teammate.aiAnalysis.potentialRisks.map((risk, i) => (
+                                        <li key={i} className="flex items-start gap-1">
+                                          <span className="text-yellow-500 mt-1">•</span>
+                                          {risk}
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                                </div>
+
+                                <div className="bg-primary/10 border border-primary/20 rounded-lg p-3">
+                                  <p className="text-xs text-muted-foreground">
+                                    <span className="font-medium text-primary">Prediction:</span> {teammate.aiAnalysis.teamSuccessPrediction}
+                                  </p>
+                                </div>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </div>
+                      )}
+
                       <div className="flex gap-2 mt-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Button size="sm" variant="outline" className="flex-1">
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          className="flex-1"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleMessage(teammate)
+                          }}
+                        >
                           <MessageSquare className="w-4 h-4 mr-1" />
                           Message
                         </Button>
                         <motion.div className="flex-1" whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                          <Button size="sm" className="w-full glow-border">
-                            Invite
+                          <Button 
+                            size="sm" 
+                            className="w-full glow-border"
+                            disabled={invitedIds.includes(teammate.id)}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleInvite(teammate)
+                            }}
+                          >
+                            {invitedIds.includes(teammate.id) ? (
+                              <>
+                                <Check className="w-4 h-4 mr-1" />
+                                Invited
+                              </>
+                            ) : (
+                              "Invite"
+                            )}
                           </Button>
                         </motion.div>
                       </div>
@@ -534,6 +766,154 @@ export default function TeamMatchPage() {
           </div>
         </motion.div>
       </div>
+
+      {/* Message Dialog */}
+      <Dialog open={messageDialogOpen} onOpenChange={setMessageDialogOpen}>
+        <DialogContent className="sm:max-w-md bg-card border-border">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MessageSquare className="w-5 h-5 text-primary" />
+              Message {selectedTeammate?.name}
+            </DialogTitle>
+            <DialogDescription>
+              Send a message to start a conversation about collaborating together.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/50">
+              <div className="w-10 h-10 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center">
+                <span className="text-primary font-semibold text-sm">{selectedTeammate?.avatar}</span>
+              </div>
+              <div>
+                <p className="font-medium">{selectedTeammate?.name}</p>
+                <p className="text-sm text-muted-foreground">{selectedTeammate?.role}</p>
+              </div>
+            </div>
+            <Textarea
+              placeholder="Hi! I saw your profile and would love to collaborate on..."
+              value={messageText}
+              onChange={(e) => setMessageText(e.target.value)}
+              rows={4}
+              className="resize-none"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setMessageDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={sendMessage} 
+              disabled={!messageText.trim() || sendingMessage}
+              className="glow-border"
+            >
+              {sendingMessage ? (
+                <>Sending...</>
+              ) : (
+                <>
+                  <Send className="w-4 h-4 mr-2" />
+                  Send Message
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Invite Dialog */}
+      <Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}>
+        <DialogContent className="sm:max-w-md bg-card border-border">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Users className="w-5 h-5 text-primary" />
+              Invite to Team
+            </DialogTitle>
+            <DialogDescription>
+              Send a team invitation to {selectedTeammate?.name}. They will receive a notification and can accept or decline.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="p-4 rounded-lg bg-secondary/50 space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center">
+                  <span className="text-primary font-semibold">{selectedTeammate?.avatar}</span>
+                </div>
+                <div className="flex-1">
+                  <p className="font-medium">{selectedTeammate?.name}</p>
+                  <p className="text-sm text-muted-foreground">{selectedTeammate?.role}</p>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Star className="w-4 h-4 text-primary" />
+                  <span className="text-sm text-primary font-medium">{selectedTeammate?.compatibility}%</span>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {selectedTeammate?.skills.map((skill) => (
+                  <Badge key={skill} variant="secondary" className="text-xs">
+                    {skill}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setInviteDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={confirmInvite} 
+              disabled={sendingInvite}
+              className="glow-border"
+            >
+              {sendingInvite ? (
+                <>Sending...</>
+              ) : (
+                <>
+                  <Send className="w-4 h-4 mr-2" />
+                  Send Invitation
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Team Dialog */}
+      <Dialog open={createTeamDialogOpen} onOpenChange={setCreateTeamDialogOpen}>
+        <DialogContent className="sm:max-w-md bg-card border-border">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Users className="w-5 h-5 text-primary" />
+              Create New Team
+            </DialogTitle>
+            <DialogDescription>
+              Create a new team to participate in hackathons and collaborate with other developers.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="teamName">Team Name *</Label>
+              <Input
+                id="teamName"
+                placeholder="Enter your team name"
+                value={newTeamName}
+                onChange={(e) => setNewTeamName(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreateTeamDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleCreateTeam} 
+              disabled={isCreatingTeam || !newTeamName.trim()}
+              className="glow-border"
+            >
+              {isCreatingTeam ? "Creating Team..." : "Create Team"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }

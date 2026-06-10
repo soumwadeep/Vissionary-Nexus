@@ -1,234 +1,187 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
-import { useWalletAuth } from "@/hooks/use-wallet-auth";
-import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
-import { Navbar } from "@/components/landing/navbar";
-import { Card } from "@/components/ui/card";
-import { Trophy, Users, Zap, TrendingUp } from "lucide-react";
-
-interface DashboardStats {
-  totalReputation: number;
-  achievementsCount: number;
-  profileViews: number;
-  networkStatus: string;
-}
+import { motion } from 'framer-motion';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/hooks/use-auth';
+import { Cpu, Network, Database, Zap } from 'lucide-react';
 
 export default function DashboardPage() {
-  const { profile, isLoading } = useWalletAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
   const router = useRouter();
-  const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [isLoadingStats, setIsLoadingStats] = useState(true);
+  const [phase, setPhase] = useState(0);
+  const [progress, setProgress] = useState(0);
+  const [isComplete, setIsComplete] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
+  const loadingPhases = [
+    { icon: Cpu, text: 'Loading Dashboard Systems...' },
+    { icon: Database, text: 'Fetching Your Data...' },
+    { icon: Network, text: 'Initializing Connections...' },
+    { icon: Zap, text: 'Preparing Your Workspace...' },
+  ];
+
+  // Mount check for hydration
   useEffect(() => {
-    if (!isLoading && !profile?.address) {
-      router.push("/");
+    setMounted(true);
+  }, []);
+
+  // Handle redirect logic
+  useEffect(() => {
+    if (isLoading) return;
+
+    if (!isAuthenticated) {
+      router.push('/auth/login');
+      return;
     }
-  }, [isLoading, profile?.address, router]);
 
-  useEffect(() => {
-    const loadStats = async () => {
-      if (!profile?.address) return;
-
-      try {
-        // Fetch achievements
-        const achievementsRes = await fetch(
-          `/api/wallet/achievements?address=${profile.address}`,
-        );
-        const achievements = achievementsRes.ok
-          ? await achievementsRes.json()
-          : [];
-
-        setStats({
-          totalReputation: profile.reputation || 0,
-          achievementsCount: achievements.length,
-          profileViews: Math.floor(Math.random() * 100) + 10,
-          networkStatus: "Connected to Somnia",
-        });
-      } catch (error) {
-        console.error("Failed to load stats:", error);
-      } finally {
-        setIsLoadingStats(false);
+    // Give animation time before redirecting
+    const redirectTimeout = setTimeout(() => {
+      const role = user?.role || 'participant';
+      switch (role) {
+        case 'host':
+          router.push('/dashboard/host');
+          break;
+        case 'judge':
+          router.push('/dashboard/judge');
+          break;
+        case 'mentor':
+          router.push('/dashboard/mentor');
+          break;
+        case 'member':
+        case 'participant':
+        default:
+          router.push('/dashboard/participant');
+          break;
       }
-    };
+    }, 4000); // Total animation duration
 
-    loadStats();
-  }, [profile?.address, profile?.reputation]);
+    return () => clearTimeout(redirectTimeout);
+  }, [isLoading, isAuthenticated, user?.role, router]);
 
-  if (isLoading || !profile?.address) {
-    return (
-      <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-black flex items-center justify-center">
-        <div className="text-white">Loading...</div>
-      </div>
-    );
+  // Handle boot sequence animation
+  useEffect(() => {
+    if (!mounted) return;
+
+    if (phase >= loadingPhases.length) {
+      setIsComplete(true);
+      return;
+    }
+
+    const phaseTimeout = setTimeout(() => {
+      setPhase((p) => p + 1);
+      setProgress(0);
+    }, 1000);
+
+    return () => clearTimeout(phaseTimeout);
+  }, [phase, mounted, loadingPhases.length]);
+
+  // Handle progress bar animation
+  useEffect(() => {
+    if (!mounted || isComplete) return;
+
+    const progressInterval = setInterval(() => {
+      setProgress((prev) => {
+        if (prev >= 100) return 100;
+        return prev + Math.random() * 40;
+      });
+    }, 100);
+
+    return () => clearInterval(progressInterval);
+  }, [mounted, isComplete]);
+
+  if (!mounted || isComplete) {
+    return null;
   }
 
+  const currentStep = loadingPhases[phase] || loadingPhases[0];
+  const Icon = currentStep.icon;
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-black">
-      <Navbar />
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="fixed inset-0 z-50 bg-background flex flex-col items-center justify-center gap-8"
+    >
+      {/* Animated logo */}
+      <div className="relative">
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ duration: 3, repeat: Infinity, ease: 'linear' }}
+          className="w-24 h-24 rounded-full border-2 border-primary/20"
+        />
+        <motion.div
+          animate={{ rotate: -360 }}
+          transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
+          className="absolute inset-2 rounded-full border-2 border-primary/40 border-dashed"
+        />
+        <motion.div
+          animate={{ scale: [1, 1.2, 1] }}
+          transition={{ duration: 1.5, repeat: Infinity }}
+          className="absolute inset-0 flex items-center justify-center"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/icon.svg"
+            alt="Vissionary Nexus"
+            className="w-12 h-12"
+          />
+        </motion.div>
+      </div>
 
-      <div className="relative pt-32 px-4 pb-16">
-        <div className="max-w-6xl mx-auto">
-          {/* Header */}
+      {/* Title and subtitle */}
+      <div className="text-center">
+        <motion.h2
+          key={phase}
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-2xl font-bold text-primary glow-text"
+        >
+          Loading Dashboard
+        </motion.h2>
+        <motion.p
+          key={`text-${phase}`}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.1 }}
+          className="text-sm text-muted-foreground mt-2"
+        >
+          {currentStep.text}
+        </motion.p>
+      </div>
+
+      {/* Progress bar */}
+      <div className="w-64">
+        <div className="h-1 bg-secondary rounded-full overflow-hidden">
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mb-12"
-          >
-            <h1 className="text-4xl font-bold text-white mb-2">
-              Welcome back,{" "}
-              {profile?.role === "builder"
-                ? "Builder"
-                : profile?.role === "investor"
-                  ? "Investor"
-                  : "Creator"}
-              !
-            </h1>
-            <p className="text-slate-400">
-              Connected:{" "}
-              <span className="text-primary font-mono">
-                {profile.address.slice(0, 6)}...{profile.address.slice(-4)}
-              </span>
-            </p>
-          </motion.div>
-
-          {/* Stats Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-            {isLoadingStats ? (
-              <div className="text-white col-span-4">Loading stats...</div>
-            ) : (
-              <>
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.1 }}
-                >
-                  <Card className="p-6 bg-slate-800/50 border-primary/20 hover:border-primary/50 transition-colors">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-slate-400 text-sm">Reputation</p>
-                        <p className="text-3xl font-bold text-primary mt-2">
-                          {stats?.totalReputation || 0}
-                        </p>
-                      </div>
-                      <Trophy className="w-8 h-8 text-primary/50" />
-                    </div>
-                  </Card>
-                </motion.div>
-
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.2 }}
-                >
-                  <Card className="p-6 bg-slate-800/50 border-primary/20 hover:border-primary/50 transition-colors">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-slate-400 text-sm">Achievements</p>
-                        <p className="text-3xl font-bold text-primary mt-2">
-                          {stats?.achievementsCount || 0}
-                        </p>
-                      </div>
-                      <Zap className="w-8 h-8 text-primary/50" />
-                    </div>
-                  </Card>
-                </motion.div>
-
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.3 }}
-                >
-                  <Card className="p-6 bg-slate-800/50 border-primary/20 hover:border-primary/50 transition-colors">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-slate-400 text-sm">Profile Views</p>
-                        <p className="text-3xl font-bold text-primary mt-2">
-                          {stats?.profileViews || 0}
-                        </p>
-                      </div>
-                      <Users className="w-8 h-8 text-primary/50" />
-                    </div>
-                  </Card>
-                </motion.div>
-
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.4 }}
-                >
-                  <Card className="p-6 bg-slate-800/50 border-primary/20 hover:border-primary/50 transition-colors">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-slate-400 text-sm">Network</p>
-                        <p className="text-sm font-semibold text-primary mt-2 line-clamp-2">
-                          {stats?.networkStatus}
-                        </p>
-                      </div>
-                      <TrendingUp className="w-8 h-8 text-primary/50" />
-                    </div>
-                  </Card>
-                </motion.div>
-              </>
-            )}
-          </div>
-
-          {/* Profile Info */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5 }}
-          >
-            <Card className="p-8 bg-slate-800/30 border-primary/20">
-              <h2 className="text-xl font-bold text-white mb-6">
-                Profile Information
-              </h2>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <p className="text-slate-400 text-sm mb-2">Role</p>
-                  <p className="text-white capitalize text-lg font-semibold">
-                    {profile.role}
-                  </p>
-                </div>
-
-                {profile.interests && profile.interests.length > 0 && (
-                  <div>
-                    <p className="text-slate-400 text-sm mb-2">Interests</p>
-                    <div className="flex flex-wrap gap-2">
-                      {profile.interests.map((interest) => (
-                        <span
-                          key={interest}
-                          className="text-xs bg-primary/20 text-primary px-3 py-1 rounded-full"
-                        >
-                          {interest}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                <div>
-                  <p className="text-slate-400 text-sm mb-2">
-                    Onboarding Status
-                  </p>
-                  <p className="text-primary font-semibold">
-                    {profile.onboardingComplete ? "✓ Completed" : "In Progress"}
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-slate-400 text-sm mb-2">Member Since</p>
-                  <p className="text-white text-sm">
-                    {new Date(profile.joinedAt).toLocaleDateString()}
-                  </p>
-                </div>
-              </div>
-            </Card>
-          </motion.div>
+            className="h-full bg-primary"
+            initial={{ width: '0%' }}
+            animate={{ width: `${Math.min(progress, 100)}%` }}
+            transition={{ duration: 0.2 }}
+          />
+        </div>
+        <div className="flex justify-between mt-2 text-xs text-muted-foreground">
+          <span>Phase {phase + 1}/{loadingPhases.length}</span>
+          <span>{Math.min(Math.round(progress), 100)}%</span>
         </div>
       </div>
-    </div>
+
+      {/* Boot log */}
+      <div className="font-mono text-xs text-muted-foreground/50 max-w-sm text-center">
+        {loadingPhases.map((step, i) => (
+          <motion.div
+            key={i}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: i < phase ? 0.5 : i === phase ? 1 : 0 }}
+            className="flex items-center gap-2 justify-center h-5"
+          >
+            <span className={i < phase ? 'text-primary' : i === phase ? 'text-primary' : 'text-muted-foreground'}>
+              {i < phase ? '✓' : '○'}
+            </span>
+            <span>{step.text.replace('...', '')}</span>
+          </motion.div>
+        ))}
+      </div>
+    </motion.div>
   );
 }

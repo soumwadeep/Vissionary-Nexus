@@ -122,7 +122,7 @@ export function SomniaSyncIndicator() {
       <div className="grid grid-cols-2 gap-2 text-xs">
         <div className="p-2 rounded-lg bg-background/50">
           <p className="text-muted-foreground">Network</p>
-          <p className="font-medium">{isSomniaNetwork ? "Somnia Testnet" : "Not Somnia"}</p>
+          <p className="font-medium">{isSomniaNetwork ? "Somnia Shannon Testnet" : "Not Somnia"}</p>
         </div>
         <div className="p-2 rounded-lg bg-background/50">
           <p className="text-muted-foreground">Last Sync</p>
@@ -134,7 +134,7 @@ export function SomniaSyncIndicator() {
 
       {!isSomniaNetwork && isConnected && (
         <p className="text-xs text-muted-foreground mt-2 text-center">
-          Switch to Somnia Testnet to sync
+          Switch to Somnia Shannon Testnet to sync
         </p>
       )}
     </motion.div>

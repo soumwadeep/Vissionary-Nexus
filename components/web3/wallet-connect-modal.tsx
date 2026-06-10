@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation"
 import { networkMeta, somniaTestnet } from "@/lib/web3-config"
 import { WalletProfile } from "@/hooks/use-wallet-auth"
 import { NetworkSwitchModal } from "./network-switch-modal"
+import { analyticsEvents } from "@/lib/analytics"
 
 interface WalletConnectModalProps {
   isOpen: boolean
@@ -26,6 +27,7 @@ export function WalletConnectModal({ isOpen, onClose, userProfile }: WalletConne
   const [particles, setParticles] = useState<Array<{ id: number; x: number; y: number; delay: number }>>([])
   const [isNetworkModalOpen, setIsNetworkModalOpen] = useState(false)
   const [selectedNetwork, setSelectedNetwork] = useState('somnia')
+  const [lastConnectedConnector, setLastConnectedConnector] = useState<string | null>(null)
   useEffect(() => {
     if (isOpen) {
       const newParticles = Array.from({ length: 20 }, (_, i) => ({
@@ -39,6 +41,7 @@ export function WalletConnectModal({ isOpen, onClose, userProfile }: WalletConne
   }, [isOpen])
 
   const handleConnectWallet = (connector: any) => {
+    setLastConnectedConnector(connector.name)
     connect({ connector })
     // After connection, redirect to onboarding if not completed
     setTimeout(() => {
@@ -48,6 +51,14 @@ export function WalletConnectModal({ isOpen, onClose, userProfile }: WalletConne
       }
     }, 1000)
   }
+
+  // Track wallet connection event when isConnected becomes true
+  useEffect(() => {
+    if (isConnected && lastConnectedConnector) {
+      const chainName = chains.find(c => c.id === chainId)?.name || "Unknown"
+      analyticsEvents.walletConnected(lastConnectedConnector, chainName)
+    }
+  }, [isConnected, lastConnectedConnector, chainId, chains])
 
   const handleNetworkSwitch = (network: string) => {
     setSelectedNetwork(network)
@@ -63,17 +74,19 @@ export function WalletConnectModal({ isOpen, onClose, userProfile }: WalletConne
   }
 
   return (
+    <>
     <AnimatePresence>
       {isOpen && (
         <motion.div
+          key="wallet-connect-modal"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+          className="fixed inset-0 z-[99999] flex items-center justify-center p-4"
           onClick={onClose}
         >
           {/* Backdrop */}
-          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
+          <div className="absolute inset-0 bg-black/90 backdrop-blur-md z-0" />
 
           {/* Modal */}
           <motion.div
@@ -82,7 +95,7 @@ export function WalletConnectModal({ isOpen, onClose, userProfile }: WalletConne
             exit={{ scale: 0.9, opacity: 0, y: 20 }}
             transition={{ type: "spring", duration: 0.5 }}
             onClick={(e) => e.stopPropagation()}
-            className="relative w-full max-w-md"
+            className="relative w-full max-w-md z-10"
           >
             {/* Glow effect */}
             <div className="absolute -inset-1 bg-gradient-to-r from-primary/50 via-primary/20 to-primary/50 rounded-2xl blur-xl opacity-50 animate-pulse" />
@@ -228,9 +241,15 @@ export function WalletConnectModal({ isOpen, onClose, userProfile }: WalletConne
               ) : (
                 <div className="space-y-3">
                   {/* Wallet options */}
+                  {connectors.length === 0 && (
+                    <div className="rounded-lg border border-slate-700 bg-slate-800/50 p-4 text-sm text-slate-400">
+                      No browser wallet detected. Install MetaMask or add a WalletConnect project id later.
+                    </div>
+                  )}
+
                   {connectors.map((connector, index) => (
                     <motion.div
-                      key={connector.uid}
+                      key={`${connector.id}-${connector.uid}-${index}`}
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: index * 0.1 }}
@@ -289,13 +308,14 @@ export function WalletConnectModal({ isOpen, onClose, userProfile }: WalletConne
           </motion.div>
         </motion.div>
       )}
-
-      <NetworkSwitchModal
-        isOpen={isNetworkModalOpen}
-        onClose={() => setIsNetworkModalOpen(false)}
-        currentNetwork={selectedNetwork}
-        onNetworkSwitch={handleNetworkSwitch}
-      />
     </AnimatePresence>
+
+    <NetworkSwitchModal
+      isOpen={isNetworkModalOpen}
+      onClose={() => setIsNetworkModalOpen(false)}
+      currentNetwork={selectedNetwork}
+      onNetworkSwitch={handleNetworkSwitch}
+    />
+    </>
   )
 }

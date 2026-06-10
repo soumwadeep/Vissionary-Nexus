@@ -3,36 +3,23 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { Check, Zap } from 'lucide-react';
+import { Check, Zap, AlertCircle } from 'lucide-react';
+import { useSwitchChain, useChainId } from 'wagmi';
+import { somniaTestnet } from '@/lib/web3-config';
+import { mainnet } from 'wagmi/chains';
+import type { Chain } from 'wagmi/chains';
 
 interface NetworkSwitchModalProps {
   isOpen: boolean;
   onClose: () => void;
   currentNetwork?: string;
-  onNetworkSwitch: (network: string) => void;
+  onNetworkSwitch?: (network: string) => void;
 }
 
-const networks = [
-  {
-    id: 'somnia',
-    name: 'Somnia Network',
-    description: 'AI-optimized L2 solution',
-    icon: '🌐',
-    badge: 'Recommended',
-  },
-  {
-    id: 'ethereum',
-    name: 'Ethereum Mainnet',
-    description: 'Mainnet compatibility',
-    icon: '⟠',
-  },
-  {
-    id: 'base',
-    name: 'Base',
-    description: 'Optimized for speed',
-    icon: '◆',
-  },
-];
+const networkMap: Record<string, Chain> = {
+  somnia: somniaTestnet as unknown as Chain,
+  ethereum: mainnet,
+};
 
 export function NetworkSwitchModal({
   isOpen,
@@ -41,19 +28,75 @@ export function NetworkSwitchModal({
   onNetworkSwitch,
 }: NetworkSwitchModalProps) {
   const [selectedNetwork, setSelectedNetwork] = useState(currentNetwork);
-  const [isVerifying, setIsVerifying] = useState(false);
+  const [isSwitching, setIsSwitching] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const { switchChain } = useSwitchChain();
 
   const handleSwitch = async (networkId: string) => {
-    setIsVerifying(true);
+    setIsSwitching(true);
+    setError(null);
     setSelectedNetwork(networkId);
-    
-    // Simulate network verification
-    setTimeout(() => {
-      onNetworkSwitch(networkId);
-      setIsVerifying(false);
+
+    try {
+      const targetChain = networkMap[networkId];
+      if (!targetChain) throw new Error('Unknown network');
+
+      await switchChain({ chainId: targetChain.id });
+
+      if (onNetworkSwitch) {
+        onNetworkSwitch(networkId);
+      }
+
       onClose();
-    }, 1500);
+    } catch (err: any) {
+      // Handle error where chain isn't added to MetaMask
+      if (err.code === 4902 || err.message?.includes('chain not recognized') || err.message?.includes('not found')) {
+        try {
+          const targetChain = networkMap[networkId];
+          await (window as any).ethereum?.request({
+            method: 'wallet_addEthereumChain',
+            params: [
+              {
+                chainId: `0x${targetChain.id.toString(16)}`,
+                chainName: targetChain.name,
+                nativeCurrency: targetChain.nativeCurrency,
+                rpcUrls: targetChain.rpcUrls.default.http,
+                blockExplorerUrls: [targetChain.blockExplorers?.default?.url || ""],
+              },
+            ],
+          });
+          // After adding, try switching again
+          await switchChain({ chainId: targetChain.id });
+          if (onNetworkSwitch) {
+            onNetworkSwitch(networkId);
+          }
+          onClose();
+        } catch (addErr: any) {
+          setError(addErr.message || 'Failed to add network');
+        }
+      } else {
+        setError(err.message || 'Failed to switch network');
+      }
+    } finally {
+      setIsSwitching(false);
+    }
   };
+
+  const networks = [
+    {
+      id: 'somnia',
+      name: 'Somnia Shannon Testnet',
+      description: 'AI-optimized L2 solution',
+      icon: '🌐',
+      badge: 'Recommended',
+    },
+    {
+      id: 'ethereum',
+      name: 'Ethereum Mainnet',
+      description: 'Mainnet compatibility',
+      icon: '⟠',
+    },
+  ];
 
   return (
     <AnimatePresence>
@@ -65,7 +108,7 @@ export function NetworkSwitchModal({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40"
+            className="fixed inset-0 bg-black/80 backdrop-blur-md z-[99998]"
           />
 
           {/* Modal */}
@@ -74,7 +117,7 @@ export function NetworkSwitchModal({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             transition={{ duration: 0.3 }}
-            className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50"
+            className="fixed top-1/2 left/1/2 -translate-x-1/2 -translate-y-1/2 z-[99999]"
           >
             <div className="bg-slate-950 border border-primary/30 rounded-xl p-6 w-96 shadow-2xl">
               {/* Header */}
@@ -88,6 +131,18 @@ export function NetworkSwitchModal({
                 Switch Network
               </motion.h2>
 
+              {/* Error Message */}
+              {error && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-sm text-red-400 flex items-center gap-2"
+                >
+                  <AlertCircle className="w-4 h-4" />
+                  {error}
+                </motion.div>
+              )}
+
               {/* Network list */}
               <div className="space-y-3 mb-6">
                 {networks.map((network, index) => (
@@ -97,12 +152,12 @@ export function NetworkSwitchModal({
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.1 + index * 0.1 }}
                     onClick={() => handleSwitch(network.id)}
-                    disabled={isVerifying}
+                    disabled={isSwitching}
                     className={`w-full text-left p-4 rounded-lg border-2 transition-all ${
                       selectedNetwork === network.id
                         ? 'border-primary bg-primary/10'
                         : 'border-slate-700 bg-slate-800/50 hover:border-primary/50'
-                    } ${isVerifying && selectedNetwork !== network.id ? 'opacity-50' : ''}`}
+                    } ${isSwitching && selectedNetwork !== network.id ? 'opacity-50' : ''}`}
                   >
                     <div className="flex items-start justify-between">
                       <div>
@@ -123,7 +178,7 @@ export function NetworkSwitchModal({
                           animate={{ scale: 1 }}
                           transition={{ type: 'spring', stiffness: 200 }}
                         >
-                          {isVerifying ? (
+                          {isSwitching ? (
                             <motion.div
                               className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full"
                               animate={{ rotate: 360 }}
@@ -150,16 +205,16 @@ export function NetworkSwitchModal({
                   onClick={onClose}
                   variant="outline"
                   className="flex-1"
-                  disabled={isVerifying}
+                  disabled={isSwitching}
                 >
                   Cancel
                 </Button>
                 <Button
                   onClick={() => handleSwitch(selectedNetwork)}
                   className="flex-1"
-                  disabled={isVerifying}
+                  disabled={isSwitching}
                 >
-                  {isVerifying ? 'Verifying...' : 'Confirm'}
+                  {isSwitching ? 'Switching...' : 'Confirm'}
                 </Button>
               </motion.div>
             </div>

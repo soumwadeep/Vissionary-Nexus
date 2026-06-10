@@ -13,16 +13,19 @@ import {
   Trophy,
   Settings,
   LogOut,
+  Home,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useState } from "react"
 import { cn } from "@/lib/utils"
+import { useAuth } from "@/hooks/use-auth"
 
 const menuItems = [
+  { icon: Home, label: "Home", href: "/" },
   { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard/host" },
-  { icon: CalendarPlus, label: "Create Event", href: "/dashboard/host/create-event" },
+  { icon: CalendarPlus, label: "Create Event", href: "/dashboard/host/events/create" },
   { icon: Users, label: "Participants", href: "/dashboard/host/participants" },
   { icon: FileCheck, label: "Submissions", href: "/dashboard/host/submissions" },
   { icon: Shield, label: "AI Moderation", href: "/dashboard/host/moderation" },
@@ -34,6 +37,7 @@ const menuItems = [
 export function HostSidebar() {
   const pathname = usePathname()
   const [collapsed, setCollapsed] = useState(false)
+  const { logout } = useAuth()
 
   return (
     <motion.aside
@@ -47,15 +51,16 @@ export function HostSidebar() {
       <div className="flex flex-col h-full">
         {/* Logo */}
         <div className="p-4 border-b border-sidebar-border">
-          <Link href="/" className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-chart-2/20 border border-chart-2/30 flex items-center justify-center shrink-0">
-              <span className="text-chart-2 font-bold">VN</span>
-            </div>
+          <Link href="/dashboard/participant" className="flex items-center gap-3">
+            <img src="/apple-icon.png" alt="Vissionary Nexus" className="w-14 h-14 rounded-xl glow-border shrink-0" />
             {!collapsed && (
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                <span className="font-bold text-lg">Nexus</span>
-                <span className="text-xs text-chart-2 block">Host Portal</span>
-              </motion.div>
+              <motion.span
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="font-bold text-lg"
+              >
+                Nexus
+              </motion.span>
             )}
           </Link>
         </div>
@@ -66,16 +71,16 @@ export function HostSidebar() {
             const isActive = pathname === item.href
             return (
               <Link
-                key={item.href}
+                key={`${item.label}-${item.href}`}
                 href={item.href}
                 className={cn(
                   "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200",
                   isActive
-                    ? "bg-sidebar-accent text-chart-2 border border-chart-2/30"
+                    ? "bg-sidebar-accent text-sidebar-primary border border-primary/30 glow-border"
                     : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
                 )}
               >
-                <item.icon className={cn("w-5 h-5 shrink-0", isActive && "text-chart-2")} />
+                <item.icon className={cn("w-5 h-5 shrink-0", isActive && "text-primary")} />
                 {!collapsed && (
                   <span className="text-sm font-medium">{item.label}</span>
                 )}
@@ -88,6 +93,7 @@ export function HostSidebar() {
         <div className="p-4 border-t border-sidebar-border space-y-2">
           <Button
             variant="ghost"
+            onClick={logout}
             className={cn(
               "w-full justify-start text-sidebar-foreground/70 hover:text-destructive",
               collapsed && "justify-center"

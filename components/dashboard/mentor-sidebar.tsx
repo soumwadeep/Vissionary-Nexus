@@ -12,14 +12,17 @@ import {
   Award,
   Settings,
   LogOut,
+  Home,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useState } from "react"
 import { cn } from "@/lib/utils"
+import { useAuth } from "@/hooks/use-auth"
 
 const menuItems = [
+  { icon: Home, label: "Home", href: "/" },
   { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard/mentor" },
   { icon: Users, label: "My Teams", href: "/dashboard/mentor/teams" },
   { icon: Calendar, label: "Sessions", href: "/dashboard/mentor/sessions" },
@@ -32,6 +35,7 @@ const menuItems = [
 export function MentorSidebar() {
   const pathname = usePathname()
   const [collapsed, setCollapsed] = useState(false)
+  const { logout } = useAuth()
 
   return (
     <motion.aside
@@ -45,9 +49,7 @@ export function MentorSidebar() {
       <div className="flex flex-col h-full">
         <div className="p-4 border-b border-sidebar-border">
           <Link href="/" className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-purple-500/20 border border-purple-500/30 flex items-center justify-center shrink-0">
-              <span className="text-purple-400 font-bold">VN</span>
-            </div>
+            <img src="/apple-icon.png" alt="Vissionary Nexus" className="w-14 h-14 rounded-xl shrink-0" />
             {!collapsed && (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
                 <span className="font-bold text-lg">Nexus</span>
@@ -79,7 +81,7 @@ export function MentorSidebar() {
         </nav>
 
         <div className="p-4 border-t border-sidebar-border space-y-2">
-          <Button variant="ghost" className={cn("w-full justify-start text-sidebar-foreground/70 hover:text-destructive", collapsed && "justify-center")}>
+          <Button variant="ghost" onClick={logout} className={cn("w-full justify-start text-sidebar-foreground/70 hover:text-destructive", collapsed && "justify-center")}>
             <LogOut className="w-5 h-5" />
             {!collapsed && <span className="ml-3">Logout</span>}
           </Button>

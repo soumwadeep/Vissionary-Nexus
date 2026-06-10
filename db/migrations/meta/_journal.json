@@ -1,0 +1,1 @@
+{"version":"7","dialect":"postgresql","entries":[{"idx":0,"version":"7","when":1772408196627,"tag":"0000_lazy_logan","breakpoints":true},{"idx":1,"version":"7","when":1772413154993,"tag":"0001_add_missing_tables","breakpoints":true},{"idx":2,"version":"7","when":1780937425993,"tag":"0002_add_tasks_and_ai_goal_history","breakpoints":true}]}

@@ -5,6 +5,8 @@ import Link from "next/link"
 import { Users, Crown, GraduationCap, Scale, ArrowRight, Check } from "lucide-react"
 import { AnimatedNetworkBackground } from "@/components/animated-network-background"
 import { useState } from "react"
+import { analyticsEvents } from "@/lib/analytics"
+import { useRouter } from "next/navigation"
 
 const roles = [
   {
@@ -47,6 +49,7 @@ const roles = [
 
 export default function RoleSelectPage() {
   const [selectedRole, setSelectedRole] = useState<string | null>(null)
+  const router = useRouter()
 
   return (
     <div className="relative min-h-screen flex items-center justify-center overflow-hidden">
@@ -112,13 +115,16 @@ export default function RoleSelectPage() {
                       animate={{ opacity: 1, scale: 1 }}
                       className="mt-4 pt-4 border-t border-border"
                     >
-                      <Link
-                        href={role.href}
+                      <button
+                        onClick={() => {
+                          analyticsEvents.roleSelected(role.id)
+                          router.push(role.href)
+                        }}
                         className="inline-flex items-center text-primary font-medium hover:underline"
                       >
                         Continue as {role.title}
                         <ArrowRight className="w-4 h-4 ml-2" />
-                      </Link>
+                      </button>
                     </motion.div>
                   )}
                 </button>

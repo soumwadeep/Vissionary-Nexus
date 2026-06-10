@@ -8,6 +8,7 @@ import { FloatingParticles } from '@/components/effects/floating-particles';
 import { HolographicCard } from '@/components/effects/holographic-card';
 import { useWalletAuth } from '@/hooks/use-wallet-auth';
 import { Code2, TrendingUp, Palette } from 'lucide-react';
+import { analyticsEvents } from '@/lib/analytics';
 
 const roles = [
   {
@@ -43,6 +44,7 @@ export default function RoleSelectPage() {
     if (!selectedRole) return;
     
     setIsLoading(true);
+    analyticsEvents.roleSelected(selectedRole)
     setRole(selectedRole as 'builder' | 'investor' | 'creator');
     
     setTimeout(() => {

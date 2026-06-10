@@ -15,21 +15,27 @@ import {
   User,
   Settings,
   LogOut,
+  Home,
   ChevronLeft,
   ChevronRight,
+  CalendarPlus,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useState } from "react"
 import { cn } from "@/lib/utils"
+import { useAuth } from "@/hooks/use-auth"
 
 const menuItems = [
+  { icon: Home, label: "Home", href: "/" },
   { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard/participant" },
   { icon: Calendar, label: "Events", href: "/dashboard/participant/events" },
+  { icon: CalendarPlus, label: "Create Event", href: "/dashboard/host/events/create" },
   { icon: Users, label: "AI Team Match", href: "/dashboard/participant/team-match" },
   { icon: CheckSquare, label: "Tasks", href: "/dashboard/participant/tasks" },
   { icon: FileText, label: "Submissions", href: "/dashboard/participant/submissions" },
   { icon: Trophy, label: "Leaderboard", href: "/dashboard/participant/leaderboard" },
   { icon: Brain, label: "AI Mentor", href: "/dashboard/participant/ai-mentor" },
+  { icon: Brain, label: "Nexus Agent", href: "/dashboard/participant/nexus-agent" },
   { icon: Award, label: "NFT Badges", href: "/dashboard/participant/badges" },
   { icon: User, label: "Profile", href: "/dashboard/participant/profile" },
   { icon: Settings, label: "Settings", href: "/dashboard/participant/settings" },
@@ -38,6 +44,7 @@ const menuItems = [
 export function ParticipantSidebar() {
   const pathname = usePathname()
   const [collapsed, setCollapsed] = useState(false)
+  const { logout } = useAuth()
 
   return (
     <motion.aside
@@ -51,10 +58,8 @@ export function ParticipantSidebar() {
       <div className="flex flex-col h-full">
         {/* Logo */}
         <div className="p-4 border-b border-sidebar-border">
-          <Link href="/" className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-primary/20 border border-primary/30 flex items-center justify-center shrink-0 glow-border">
-              <span className="text-primary font-bold">VN</span>
-            </div>
+          <Link href="/dashboard/participant" className="flex items-center gap-3">
+            <img src="/apple-icon.png" alt="Vissionary Nexus" className="w-14 h-14 rounded-xl glow-border shrink-0" />
             {!collapsed && (
               <motion.span
                 initial={{ opacity: 0 }}
@@ -73,7 +78,7 @@ export function ParticipantSidebar() {
             const isActive = pathname === item.href
             return (
               <Link
-                key={item.href}
+                key={`${item.label}-${item.href}`}
                 href={item.href}
                 className={cn(
                   "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200",
@@ -95,6 +100,7 @@ export function ParticipantSidebar() {
         <div className="p-4 border-t border-sidebar-border space-y-2">
           <Button
             variant="ghost"
+            onClick={logout}
             className={cn(
               "w-full justify-start text-sidebar-foreground/70 hover:text-destructive",
               collapsed && "justify-center"

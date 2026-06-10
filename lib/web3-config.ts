@@ -4,35 +4,35 @@ import { http, createConfig, createStorage } from "wagmi"
 import { mainnet, sepolia, polygon, arbitrum } from "wagmi/chains"
 import { injected, walletConnect } from "wagmi/connectors"
 
-// Somnia Testnet Configuration (preparation for mainnet)
+// Somnia Shannon Testnet Configuration (current official testnet)
 export const somniaTestnet = {
-  id: 50311,
-  name: "Somnia Testnet",
+  id: 50312,
+  name: "Somnia Shannon Testnet",
   nativeCurrency: {
     decimals: 18,
-    name: "Somnia",
+    name: "Somnia Test Token",
     symbol: "STT",
   },
   rpcUrls: {
     default: { http: ["https://dream-rpc.somnia.network"] },
   },
   blockExplorers: {
-    default: { name: "Somnia Explorer", url: "https://somnia-testnet.socialscan.io" },
+    default: { name: "Somnia Shannon Explorer", url: "https://shannon-explorer.somnia.network" },
   },
   testnet: true,
 } as const
 
 // Somnia Mainnet Configuration (future-ready)
 export const somniaMainnet = {
-  id: 50312,
+  id: 5031,
   name: "Somnia",
   nativeCurrency: {
     decimals: 18,
-    name: "Somnia",
-    symbol: "SOM",
+    name: "Somnia Token",
+    symbol: "SOMI",
   },
   rpcUrls: {
-    default: { http: ["https://rpc.somnia.network"] },
+    default: { http: ["https://api.infra.mainnet.somnia.network"] },
   },
   blockExplorers: {
     default: { name: "Somnia Explorer", url: "https://explorer.somnia.network" },
@@ -40,14 +40,14 @@ export const somniaMainnet = {
   testnet: false,
 } as const
 
+const walletConnectProjectId = process.env.NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID
+
 // Create wagmi config
 export const wagmiConfig = createConfig({
   chains: [mainnet, sepolia, polygon, arbitrum, somniaTestnet],
   connectors: [
     injected(),
-    walletConnect({
-      projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || "demo",
-    }),
+    ...(walletConnectProjectId ? [walletConnect({ projectId: walletConnectProjectId })] : []),
   ],
   storage: createStorage({ storage: typeof window !== "undefined" ? window.localStorage : undefined }),
   transports: {
