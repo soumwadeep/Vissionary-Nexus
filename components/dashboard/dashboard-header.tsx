@@ -206,7 +206,7 @@ export function DashboardHeader({ title, subtitle }: DashboardHeaderProps) {
             <DropdownMenuItem asChild>
               <Link href="/">
                 <Home className="mr-2 h-4 w-4" />
-                Go Back To Homepage
+                Home
               </Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
