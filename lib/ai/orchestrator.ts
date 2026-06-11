@@ -77,6 +77,9 @@ export interface OrchestratorResult {
   activeGoals?: any[];
   isResumeIntent?: boolean;
   needsGoalSelection?: boolean;
+  performance?: {
+    nvidiaMs: number;
+  };
 }
 
 // Main orchestrator function
@@ -219,6 +222,9 @@ export async function orchestrateAI(
       roadmap: null, // Roadmap only generated on explicit request now
       progress,
       activeGoals: await getActiveGoals(userId),
+      performance: {
+        nvidiaMs: nexusResult.metrics?.nvidiaMs || 0,
+      },
     };
     
     console.log("🏁 ORCHESTRATOR_COMPLETE", userId);

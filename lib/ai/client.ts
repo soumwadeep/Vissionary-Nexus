@@ -1,4 +1,5 @@
-// Shared NVIDIA AI client with retry and timeout handling
+import { AIMessage, elapsedMs } from "./performance"
+
 const NVIDIA_API_KEY = process.env.NVIDIA_API_KEY
 const NVIDIA_BASE_URL = "https://integrate.api.nvidia.com/v1"
 const DEFAULT_MODEL = process.env.NVIDIA_MODEL || "nvidia/nemotron-3-ultra-550b-a55b"
@@ -11,9 +12,10 @@ interface AIClientOptions {
   maxRetries?: number
 }
 
-interface AIClientResponse {
+export interface AIClientResponse {
   content: string
   model: string
+  durationMs: number
   usage: {
     prompt_tokens: number
     completion_tokens: number
@@ -21,64 +23,46 @@ interface AIClientResponse {
   }
 }
 
-// Sleep helper
 function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
 
 export async function callNVIDIA(
-  messages: Array<{ role: string; content: string }>,
+  messages: AIMessage[],
   options: AIClientOptions = {}
 ): Promise<AIClientResponse> {
+  const requestStartedAt = performance.now()
   const {
     model = DEFAULT_MODEL,
     temperature = 0.7,
-    maxTokens = 2048,
+    maxTokens = 512,
     timeout = 300000,
     maxRetries = 3
   } = options
-
-  console.log("🔍 NVIDIA AI Client Debug:")
-  console.log("  - NVIDIA_BASE_URL:", NVIDIA_BASE_URL)
-  console.log("  - NVIDIA_API_KEY exists:", !!NVIDIA_API_KEY)
-  console.log("  - NVIDIA_API_KEY starts with:", NVIDIA_API_KEY ? NVIDIA_API_KEY.slice(0, 10) + "..." : "N/A")
-  console.log("  - Model:", model)
-  console.log("  - Timeout Value:", timeout, "ms")
-
-  if (!NVIDIA_BASE_URL) {
-    throw new Error("NVIDIA_BASE_URL is not defined")
-  }
 
   if (!NVIDIA_API_KEY) {
     throw new Error("NVIDIA_API_KEY is not set")
   }
 
   const fullUrl = `${NVIDIA_BASE_URL}/chat/completions`
-  console.log("  - Full URL:", fullUrl)
+  new URL(fullUrl)
 
-  try {
-    new URL(fullUrl)
-    console.log("  - URL is valid")
-  } catch (e) {
-    console.error("  - ❌ Invalid URL:", e)
-    throw new Error(`Invalid NVIDIA API URL: ${fullUrl}`)
-  }
+  console.log(
+    `[NVIDIA Request] model=${model} messages=${messages.length} ` +
+    `maxTokens=${maxTokens} timeoutMs=${timeout}`
+  )
 
   let lastError: Error | undefined
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    const startTime = Date.now()
-    let timeoutId: any
-    try {
-      console.log(`🚀 Attempt ${attempt} started at: ${new Date(startTime).toISOString()}`)
-      const controller = new AbortController()
-      timeoutId = setTimeout(() => {
-        console.log(`⏱️ Timeout reached (${timeout}ms). Aborting request...`)
-        controller.abort()
-      }, timeout)
+    const attemptStartedAt = performance.now()
+    let timeoutId: ReturnType<typeof setTimeout> | undefined
 
-      console.log("📡 SENDING_FETCH_TO_NVIDIA", messages.length)
-      const response = await fetch(`${NVIDIA_BASE_URL}/chat/completions`, {
+    try {
+      const controller = new AbortController()
+      timeoutId = setTimeout(() => controller.abort(), timeout)
+
+      const response = await fetch(fullUrl, {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${NVIDIA_API_KEY}`,
@@ -93,11 +77,6 @@ export async function callNVIDIA(
         signal: controller.signal
       })
 
-      const endTime = Date.now()
-      console.log(`📥 Fetch returned after ${endTime - startTime}ms`)
-      console.log(`  - Status: ${response.status}`)
-      console.log(`  - Status Text: ${response.statusText}`)
-
       clearTimeout(timeoutId)
 
       if (!response.ok) {
@@ -106,23 +85,30 @@ export async function callNVIDIA(
       }
 
       const data = await response.json()
+      const durationMs = elapsedMs(requestStartedAt)
+      console.log(
+        `[NVIDIA Response] model=${data.model || model} durationMs=${durationMs} ` +
+        `promptTokens=${data.usage?.prompt_tokens ?? "unknown"} ` +
+        `completionTokens=${data.usage?.completion_tokens ?? "unknown"} ` +
+        `totalTokens=${data.usage?.total_tokens ?? "unknown"}`
+      )
+
       return {
         content: data.choices[0].message.content,
-        model: data.model,
-        usage: data.usage
+        model: data.model || model,
+        usage: data.usage,
+        durationMs
       }
     } catch (error: any) {
       if (timeoutId) clearTimeout(timeoutId)
-      const errorTime = Date.now()
-      console.error(`❌ NVIDIA API Error (attempt ${attempt}) at ${new Date(errorTime).toISOString()}:`)
-      console.error(`  - Duration since start: ${errorTime - startTime}ms`)
-      console.error("  - Error message:", error.message)
-      console.error("  - Error name:", error.name)
+      console.error(
+        `[NVIDIA Error] attempt=${attempt} durationMs=${elapsedMs(attemptStartedAt)} ` +
+        `name=${error.name} message=${error.message}`
+      )
       lastError = error
-      
-      // Only retry on network errors or 5xx errors
-      const isRetryable = 
-        error.name === "AbortError" || 
+
+      const isRetryable =
+        error.name === "AbortError" ||
         (error.message && error.message.includes("5")) ||
         (error.cause && error.cause.name === "TypeError")
 
@@ -130,9 +116,7 @@ export async function callNVIDIA(
         break
       }
 
-      // Exponential backoff
-      const backoffMs = Math.pow(2, attempt - 1) * 1000
-      await sleep(backoffMs)
+      await sleep(Math.pow(2, attempt - 1) * 1000)
     }
   }
 

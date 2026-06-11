@@ -20,7 +20,7 @@ export async function GET() {
         "Authorization": `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "meta/llama-3.3-70b-instruct",
+        model: process.env.NVIDIA_MODEL || "nvidia/nemotron-3-ultra-550b-a55b",
         messages: [
           {
             role: "user",

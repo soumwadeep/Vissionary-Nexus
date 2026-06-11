@@ -116,7 +116,7 @@ Return a JSON object with the following structure (no extra text):
         "Authorization": `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "meta/llama-3.3-70b-instruct",
+        model: process.env.NVIDIA_MODEL || "nvidia/nemotron-3-ultra-550b-a55b",
         messages: [
           { role: "system", content: "You are a helpful hackathon team advisor. Always return valid JSON only, no extra text or markdown." },
           { role: "user", content: prompt }

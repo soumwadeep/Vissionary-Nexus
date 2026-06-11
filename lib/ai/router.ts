@@ -3,6 +3,7 @@ import { callNVIDIA } from "./client"
 import { SYSTEM_PROMPTS } from "./system-prompts"
 import { checkInputGuardrails, checkOutputGuardrails } from "./guardrails"
 import { getFallbackRecommendations, getFallbackTasks, FallbackData } from "./fallback"
+import { AIMessage, elapsedMs, estimateMessageTokens, estimateTokenCount } from "./performance"
 
 export type AIFeature = "mentor" | "team_match" | "recommendations" | "task_planner" | "nexus_agent"
 
@@ -18,7 +19,17 @@ export interface AIRouterResponse {
   data?: any
   error?: string
   usedFallback: boolean
+  metrics?: {
+    nvidiaMs: number
+    model?: string
+    promptTokens?: number
+    completionTokens?: number
+    totalTokens?: number
+  }
 }
+
+const INTERACTIVE_MODEL = process.env.NVIDIA_MODEL || "nvidia/nemotron-3-ultra-550b-a55b"
+const MAX_CONVERSATION_MESSAGES = 10
 
 // Fallback function for mentor
 function getFallbackMentorResponse(userData: any, lastUserMessage: string): string {
@@ -107,6 +118,7 @@ Is there a specific area you'd like to dive deeper into?`
 
 export async function aiRouter(request: AIRouterRequest): Promise<AIRouterResponse> {
   const { feature, userData, input, messages } = request
+  let nvidiaStartedAt = 0
 
   // Step 1: Input guardrails check
   if (input) {
@@ -131,12 +143,16 @@ export async function aiRouter(request: AIRouterRequest): Promise<AIRouterRespon
       systemPrompt = (promptValue as string) || (typeof SYSTEM_PROMPTS.mentor === "function" ? SYSTEM_PROMPTS.mentor(userData?.userData || userData) : SYSTEM_PROMPTS.mentor)
     }
     
-    let nVidiaMessages: any[]
-    if (feature === "mentor" && messages && messages.length > 0) {
-      // For mentor, use full conversation history
+    let nVidiaMessages: AIMessage[]
+    const usesInteractiveModel = feature === "mentor" || feature === "nexus_agent"
+    const conversationHistory = usesInteractiveModel && messages
+      ? messages.slice(-MAX_CONVERSATION_MESSAGES)
+      : []
+
+    if (conversationHistory.length > 0) {
       nVidiaMessages = [
         { role: "system", content: systemPrompt },
-        ...messages
+        ...conversationHistory
       ]
     } else {
       nVidiaMessages = [
@@ -145,7 +161,20 @@ export async function aiRouter(request: AIRouterRequest): Promise<AIRouterRespon
       ]
     }
 
-    const response = await callNVIDIA(nVidiaMessages)
+    console.log(
+      `[AI Prompt Size] feature=${feature} ` +
+      `systemPromptTokensEstimated=${estimateTokenCount(systemPrompt)} ` +
+      `conversationHistoryTokensEstimated=${estimateMessageTokens(conversationHistory)} ` +
+      `finalRequestTokensEstimated=${estimateMessageTokens(nVidiaMessages)} ` +
+      `historyMessagesSent=${conversationHistory.length} ` +
+      `historyMessagesDiscarded=${Math.max((messages?.length || 0) - conversationHistory.length, 0)}`
+    )
+
+    nvidiaStartedAt = performance.now()
+    const response = await callNVIDIA(nVidiaMessages, {
+      model: usesInteractiveModel ? INTERACTIVE_MODEL : undefined,
+      maxTokens: 512
+    })
     console.log(`📥 callNVIDIA returned for feature ${feature}`)
 
     // Step 3: Output guardrails check
@@ -156,7 +185,14 @@ export async function aiRouter(request: AIRouterRequest): Promise<AIRouterRespon
         success: false,
         error: outputCheck.reason,
         usedFallback: true,
-        data: getFallbackData(feature, userData, input)
+        data: getFallbackData(feature, userData, input),
+        metrics: {
+          nvidiaMs: response.durationMs,
+          model: response.model,
+          promptTokens: response.usage?.prompt_tokens,
+          completionTokens: response.usage?.completion_tokens,
+          totalTokens: response.usage?.total_tokens
+        }
       }
     }
 
@@ -167,7 +203,14 @@ export async function aiRouter(request: AIRouterRequest): Promise<AIRouterRespon
     return {
       success: true,
       data: parsedData,
-      usedFallback: false
+      usedFallback: false,
+      metrics: {
+        nvidiaMs: response.durationMs,
+        model: response.model,
+        promptTokens: response.usage?.prompt_tokens,
+        completionTokens: response.usage?.completion_tokens,
+        totalTokens: response.usage?.total_tokens
+      }
     }
   } catch (error) {
     // Fallback on error
@@ -178,7 +221,10 @@ export async function aiRouter(request: AIRouterRequest): Promise<AIRouterRespon
       success: false,
       error: "AI service unavailable, using fallback",
       usedFallback: true,
-      data: getFallbackData(feature, userData, input)
+      data: getFallbackData(feature, userData, input),
+      metrics: {
+        nvidiaMs: nvidiaStartedAt ? elapsedMs(nvidiaStartedAt) : 0
+      }
     }
   }
 }

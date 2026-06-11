@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
             type: 'ai_task_saved',
             description: `Saved ${savedTasks.length} AI suggested tasks`,
             inputData: { count: savedTasks.length },
-            model: 'meta/llama-3.3-70b-instruct'
+            model: process.env.NVIDIA_MODEL || 'nvidia/nemotron-3-ultra-550b-a55b'
           })
       } catch (e) {
         console.error('Failed to track ai_task_saved:', e)
@@ -160,7 +160,7 @@ export async function PUT(request: NextRequest) {
               type: 'ai_task_completed',
               description: 'Task marked as completed',
               inputData: { taskId },
-              model: 'meta/llama-3.3-70b-instruct'
+              model: process.env.NVIDIA_MODEL || 'nvidia/nemotron-3-ultra-550b-a55b'
             })
         } catch (e) {
           console.error('Failed to track ai_task_completed:', e)

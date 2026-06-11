@@ -117,7 +117,7 @@ export async function POST(request: NextRequest) {
       try {
         await sql`
           INSERT INTO ai_activity (user_id, type, description, input_data, model)
-          VALUES (${userId}, 'ai_request', 'AI recommendations request', ${JSON.stringify({ userData })}, 'meta/llama-3.3-70b-instruct')
+          VALUES (${userId}, 'ai_request', 'AI recommendations request', ${JSON.stringify({ userData })}, ${process.env.NVIDIA_MODEL || 'nvidia/nemotron-3-ultra-550b-a55b'})
         `
       } catch (e) {
         console.error('Failed to track AI request:', e)
@@ -140,7 +140,7 @@ export async function POST(request: NextRequest) {
         try {
           await sql`
             INSERT INTO ai_activity (user_id, type, description, input_data, model)
-            VALUES (${userId}, ${result.usedFallback ? 'ai_fallback' : 'ai_error'}, ${result.error || 'AI fallback used'}, ${JSON.stringify({ userData })}, 'meta/llama-3.3-70b-instruct')
+            VALUES (${userId}, ${result.usedFallback ? 'ai_fallback' : 'ai_error'}, ${result.error || 'AI fallback used'}, ${JSON.stringify({ userData })}, ${process.env.NVIDIA_MODEL || 'nvidia/nemotron-3-ultra-550b-a55b'})
           `
         } catch (e) {
           console.error('Failed to track AI error/fallback:', e)

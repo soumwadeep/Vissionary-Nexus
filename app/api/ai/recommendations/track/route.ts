@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
       try {
         await sql`
           INSERT INTO ai_activity (user_id, type, description, input_data, model)
-          VALUES (${userId}, 'ai_recommendation_clicked', 'AI recommendation clicked', ${JSON.stringify({ recommendation })}, 'meta/llama-3.3-70b-instruct')
+          VALUES (${userId}, 'ai_recommendation_clicked', 'AI recommendation clicked', ${JSON.stringify({ recommendation })}, ${process.env.NVIDIA_MODEL || 'nvidia/nemotron-3-ultra-550b-a55b'})
         `
       } catch (e) {
         console.error('Failed to track ai_recommendation_clicked:', e)
