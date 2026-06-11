@@ -1,20 +1,21 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { FloatingParticles } from '@/components/effects/floating-particles';
-import { HolographicCard } from '@/components/effects/holographic-card';
+import { ParticleField } from '@/components/ecosystem/particle-field';
+import { HolographicPanel } from '@/components/ecosystem/micro-interactions';
 import { useWalletAuth } from '@/hooks/use-wallet-auth';
-import { Check } from 'lucide-react';
+import { useAuth } from '@/hooks/use-auth';
+import { Check, ArrowLeft, ArrowRight } from 'lucide-react';
 
 const interests = [
   'Machine Learning',
-  'Smart Contracts',
-  'DeFi',
-  'NFTs',
-  'DAOs',
+  'Artificial Intelligence',
+  'Web3',
+  'Blockchain',
+  'Game Development',
   'Gaming',
   'Social',
   'Privacy',
@@ -27,8 +28,16 @@ const interests = [
 export default function InterestsPage() {
   const router = useRouter();
   const { profile, setInterests } = useWalletAuth();
+  const { isAuthenticated, status } = useAuth();
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    if (status === 'loading') return;
+    if (!isAuthenticated) {
+      router.push('/auth/login?callbackUrl=/onboarding/interests');
+    }
+  }, [isAuthenticated, status, router]);
 
   const toggleInterest = (interest: string) => {
     setSelectedInterests((prev) =>
@@ -40,10 +49,10 @@ export default function InterestsPage() {
 
   const handleContinue = async () => {
     if (selectedInterests.length === 0) return;
-    
+
     setIsLoading(true);
     setInterests(selectedInterests);
-    
+
     setTimeout(() => {
       router.push('/onboarding/ai-init');
     }, 300);
@@ -52,61 +61,64 @@ export default function InterestsPage() {
   if (!profile?.address) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <p className="text-slate-400">Please connect your wallet first</p>
+        <p className="text-muted-foreground">Please connect your wallet first</p>
       </div>
     );
   }
 
   return (
-    <div className="relative min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-black overflow-hidden">
-      <FloatingParticles count={15} />
+    <div className="relative min-h-screen bg-background overflow-hidden">
+      {/* Particle Field Background */}
+      <ParticleField />
 
-      <div className="relative z-10 flex flex-col items-center justify-center min-h-screen px-4 py-8">
-        <div className="w-full max-w-3xl">
+      <div className="relative z-10 flex flex-col items-center justify-start min-h-screen px-4 pt-12 pb-8">
+        <div className="w-full max-w-lg space-y-6">
           {/* Header */}
           <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
-            className="text-center mb-12"
+            className="text-center mb-6"
           >
-            <h1 className="text-4xl font-bold text-white mb-2">Your Interests</h1>
-            <p className="text-slate-400">Select at least one topic that interests you</p>
+            <h1 className="text-3xl md:text-4xl font-bold text-white mb-1">What interests you?</h1>
+            <p className="text-sm md:text-base text-muted-foreground">Select at least one (or more)</p>
           </motion.div>
 
           {/* Interest grid */}
-          <HolographicCard className="mb-8">
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              {interests.map((interest, index) => (
-                <motion.button
-                  key={interest}
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: index * 0.05 }}
-                  onClick={() => toggleInterest(interest)}
-                  className={`relative p-3 rounded-lg border-2 transition-all text-sm font-medium ${
-                    selectedInterests.includes(interest)
-                      ? 'border-cyan-400 bg-cyan-400/10 text-cyan-400'
-                      : 'border-slate-700 bg-slate-800/30 text-slate-400 hover:border-cyan-500/50'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span>{interest}</span>
-                    {selectedInterests.includes(interest) && (
-                      <Check className="w-4 h-4 ml-1" />
-                    )}
-                  </div>
-                </motion.button>
-              ))}
+          <HolographicPanel className="mb-6">
+            <div className="p-4 md:p-5">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-2 md:gap-3">
+                {interests.map((interest, index) => (
+                  <motion.button
+                    key={interest}
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: index * 0.04 }}
+                    onClick={() => toggleInterest(interest)}
+                    className={`relative p-3 md:p-4 rounded-lg border transition-all text-xs md:text-sm font-medium ${
+                      selectedInterests.includes(interest)
+                        ? 'border-primary bg-primary/10 text-primary shadow-lg shadow-primary/10'
+                        : 'border-border bg-card/50 text-muted-foreground hover:border-primary/50 hover:text-primary'
+                    }`}
+                  >
+                    <div className="flex items-center justify-center gap-2">
+                      <span>{interest}</span>
+                      {selectedInterests.includes(interest) && (
+                        <Check className="w-4 h-4" />
+                      )}
+                    </div>
+                  </motion.button>
+                ))}
+              </div>
             </div>
-          </HolographicCard>
+          </HolographicPanel>
 
           {/* Selection info */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.3 }}
-            className="text-center mb-8 text-sm text-slate-400"
+            className="text-center mb-6 text-xs md:text-sm text-muted-foreground"
           >
             Selected: {selectedInterests.length} of {interests.length}
           </motion.div>
@@ -116,22 +128,26 @@ export default function InterestsPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4, duration: 0.5 }}
-            className="flex gap-4"
+            className="flex gap-3"
           >
             <Button
               onClick={() => router.back()}
               variant="outline"
-              className="flex-1"
+              className="flex-1 h-11"
             >
+              <ArrowLeft className="w-4 h-4 mr-2" />
               Back
             </Button>
-            <Button
-              onClick={handleContinue}
-              disabled={selectedInterests.length === 0 || isLoading}
-              className="flex-1 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white font-semibold"
-            >
-              {isLoading ? 'Continuing...' : 'Continue'}
-            </Button>
+            <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+              <Button
+                onClick={handleContinue}
+                disabled={selectedInterests.length === 0 || isLoading}
+                className="flex-1 glow-border font-semibold h-11"
+              >
+                {isLoading ? 'Continuing...' : 'Continue'}
+                <ArrowRight className="w-4 h-4 ml-2" />
+              </Button>
+            </motion.div>
           </motion.div>
         </div>
       </div>

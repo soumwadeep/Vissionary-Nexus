@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 
 export interface WalletProfile {
   address: string;
-  role: 'builder' | 'investor' | 'creator' | null;
+  role: 'participant' | 'host' | 'builder' | 'investor' | 'creator' | null;
   interests: string[];
   onboardingComplete: boolean;
   aiInitialized: boolean;
@@ -110,7 +110,7 @@ export function useWalletAuth() {
     localStorage.removeItem(STORAGE_KEY);
   }, []);
 
-  const setRole = useCallback((role: 'builder' | 'investor' | 'creator') => {
+  const setRole = useCallback((role: 'participant' | 'host' | 'builder' | 'investor' | 'creator') => {
     if (!profile) return;
     const updated = { ...profile, role };
     setProfile(updated);

@@ -28,9 +28,13 @@ export default function DashboardPage() {
 
   // Handle redirect logic
   useEffect(() => {
+    console.log("Dashboard page - isLoading:", isLoading)
+    console.log("Dashboard page - isAuthenticated:", isAuthenticated)
+    console.log("Dashboard page - user role:", user?.role)
     if (isLoading) return;
 
     if (!isAuthenticated) {
+      console.log("Dashboard page - not authenticated, redirecting to login")
       router.push('/auth/login');
       return;
     }

@@ -174,71 +174,20 @@ export async function orchestrateAI(
       },
     };
 
-    // 5. Run all AI features in parallel
-    const [mentorResult, recommendationsResult, tasksResult] = await Promise.allSettled([
-      // AI Mentor
-      aiRouter({
-        feature: "mentor",
-        userData,
-        input: userQuery,
-        messages: [{ role: "user", content: userQuery }],
-      }),
-      // AI Recommendations
-      aiRouter({
-        feature: "recommendations",
-        userData,
-        input: JSON.stringify(userContext),
-      }),
-      // AI Task Planner
-      aiRouter({
-        feature: "task_planner",
-        userData: {
-          ...userData,
-          userData: {
-            userProfile: userContext.profile,
-            projectContext: { goal: userQuery },
-          },
-        },
-        input: JSON.stringify({
-          userProfile: userContext.profile,
-          projectContext: { goal: userQuery },
-        }),
-      }),
-    ]);
-
-    // 6. Process results
-    const mentorAdvice =
-      mentorResult.status === "fulfilled"
-        ? mentorResult.value.data
-        : "I'm here to help with your hackathon journey! Let's break this down into actionable steps.";
-
-    const recommendations =
-      recommendationsResult.status === "fulfilled"
-        ? recommendationsResult.value.data
-            ?.map((rec: any) => ({
-              ...rec,
-              ...getActionMetadata(rec.category || "Profile"),
-            }))
-            .slice(0, 4) || []
-        : [];
-
-    const actionPlan =
-      tasksResult.status === "fulfilled"
-        ? tasksResult.value.data?.slice(0, 6) || []
-        : [];
-
-    // 7. Generate roadmap using AI mentor
-    const roadmapQuery = `Generate a personalized step-by-step roadmap for achieving this goal: "${userQuery}". 
-  Use this user context: ${serializeUserContext(userContext)}. 
-  Structure it with: Today, This Week, Next Week, Before Submission, After Submission.`;
-    const roadmapResult = await aiRouter({
-      feature: "mentor",
+    // 5. REDESIGN: Single fast call to Nexus Agent instead of multiple parallel features
+    console.log("🚀 CALLING_NEXUS_AGENT_SINGLE_REQUEST");
+    const nexusResult = await aiRouter({
+      feature: "nexus_agent",
       userData,
-      input: roadmapQuery,
-      messages: [{ role: "user", content: roadmapQuery }],
+      input: userQuery,
+      messages: [{ role: "user", content: userQuery }],
     });
 
-    // 8. Generate progress update
+    const mentorAdvice = nexusResult.success 
+      ? nexusResult.data 
+      : "I'm your Nexus Agent. How can I help you today?";
+
+    // 6. Generate progress update (Fast, non-AI)
     const totalTasks =
       (userContext.pendingTasks?.length || 0) +
       (userContext.completedTasks?.length || 0);
@@ -249,28 +198,31 @@ export async function orchestrateAI(
       userContext.teamStatus === "in_team"
     );
 
-    // 9. Save to goal history
+    // 7. Save to goal history (Background)
     console.log("SAVING_GOAL");
     await saveGoalHistory(
       userId,
       userQuery,
       goalClassification.goalType,
-      roadmapResult.data,
-      recommendations,
+      mentorAdvice, // Use the advice as the roadmap/summary for now
+      [], // Empty recommendations for speed
       progress
     );
     console.log("GOAL_SAVED");
 
-    return {
+    const result = {
       goalAnalysis: goalClassification,
       mentorAdvice,
-      recommendations,
-      actionPlan,
+      recommendations: [], // Simplified for fast first response
+      actionPlan: [], // Simplified for fast first response
       teammates: userContext.teammates || [],
-      roadmap: roadmapResult.data,
+      roadmap: null, // Roadmap only generated on explicit request now
       progress,
       activeGoals: await getActiveGoals(userId),
     };
+    
+    console.log("🏁 ORCHESTRATOR_COMPLETE", userId);
+    return result;
   } catch (error) {
     console.error("ORCHESTRATOR_ERROR", error);
     throw error;

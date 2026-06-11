@@ -120,6 +120,7 @@ export default function NexusAgentPage() {
       const data = await response.json();
       console.log("NEXUS_FRONTEND_DATA", data);
       if (data.success) {
+        console.log("🎨 RENDERING_START");
         setResult(data.data);
       } else {
         setError(data.error || "Failed to process request");

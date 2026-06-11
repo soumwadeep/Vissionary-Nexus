@@ -3,7 +3,7 @@
 import { motion } from "framer-motion"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { Menu, X, User, Home, Settings, LogOut, LayoutDashboard } from "lucide-react"
+import { Menu, X, User, Settings, LogOut, LayoutDashboard } from "lucide-react"
 import { useState } from "react"
 import { ConnectWalletButton } from "@/components/web3/connect-wallet-button"
 import { useAuth } from "@/hooks/use-auth"
@@ -26,10 +26,7 @@ const navLinks = [
 
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false)
-  const { isAuthenticated, user, logout, status, session } = useAuth()
-
-  // Debug logs
-  console.log('Navbar useAuth:', { isAuthenticated, status, user, session })
+  const { isAuthenticated, user, logout, status } = useAuth()
 
   const userInitial = user?.name ? user.name.charAt(0).toUpperCase() : "U"
 
@@ -74,7 +71,7 @@ export function Navbar() {
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="icon" className="rounded-full bg-secondary">
                       <Avatar className="h-8 w-8">
-                        <AvatarImage src={user?.avatar} alt={user?.name} />
+                        <AvatarImage src={user?.image} alt={user?.name} />
                         <AvatarFallback>{userInitial}</AvatarFallback>
                       </Avatar>
                     </Button>

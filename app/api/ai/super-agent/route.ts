@@ -28,11 +28,11 @@ export async function POST(request: NextRequest) {
         userId,
         type: 'ai_request',
         description: 'Super agent request',
-        inputData: JSON.stringify({
+        inputData: {
           query: userQuery,
           userId,
           goalIdToResume,
-        }),
+        },
         model: 'meta/llama-3.3-70b-instruct'
       });
     } catch (e) {

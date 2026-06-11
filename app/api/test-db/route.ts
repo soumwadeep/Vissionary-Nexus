@@ -18,8 +18,8 @@ export async function GET() {
     // Try queries
     const allUsers = await db.select().from(users)
     const allEvents = await db.select().from(events)
-    let allTasks = []
-    let allAIGoals = []
+    let allTasks: (typeof tasks.$inferSelect)[] = []
+    let allAIGoals: (typeof aiGoalHistory.$inferSelect)[] = []
     
     try {
       allTasks = await db.select().from(tasks)

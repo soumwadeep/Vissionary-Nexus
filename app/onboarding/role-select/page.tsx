@@ -1,52 +1,60 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { FloatingParticles } from '@/components/effects/floating-particles';
-import { HolographicCard } from '@/components/effects/holographic-card';
+import { ParticleField } from '@/components/ecosystem/particle-field';
+import { HolographicPanel } from '@/components/ecosystem/micro-interactions';
 import { useWalletAuth } from '@/hooks/use-wallet-auth';
-import { Code2, TrendingUp, Palette } from 'lucide-react';
+import { useAuth } from '@/hooks/use-auth';
+import { Code2, Trophy, Zap, CheckCircle2, ArrowRight, ArrowLeft } from 'lucide-react';
 import { analyticsEvents } from '@/lib/analytics';
 
 const roles = [
   {
+    id: 'participant',
+    title: 'Participant',
+    description: 'Join events, collaborate with teams, and build innovative projects',
+    icon: Zap,
+  },
+  {
+    id: 'host',
+    title: 'Event Host',
+    description: 'Create and manage hackathons, events, and competitions',
+    icon: Trophy,
+  },
+  {
     id: 'builder',
     title: 'Builder',
-    description: 'Develop and deploy AI applications',
+    description: 'Develop and deploy AI applications and solutions',
     icon: Code2,
-    color: 'from-blue-500 to-cyan-500',
-  },
-  {
-    id: 'investor',
-    title: 'Investor',
-    description: 'Fund innovative AI projects',
-    icon: TrendingUp,
-    color: 'from-purple-500 to-blue-500',
-  },
-  {
-    id: 'creator',
-    title: 'Creator',
-    description: 'Generate and share AI content',
-    icon: Palette,
-    color: 'from-pink-500 to-purple-500',
   },
 ];
 
 export default function RoleSelectPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const callbackUrl = searchParams.get('callbackUrl');
   const { profile, setRole } = useWalletAuth();
+  const { isAuthenticated, status } = useAuth();
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
+  useEffect(() => {
+    if (status === 'loading') return;
+    if (!isAuthenticated) {
+      router.push('/auth/login?callbackUrl=/onboarding/role-select');
+    }
+  }, [isAuthenticated, status, router]);
+
   const handleContinue = async () => {
     if (!selectedRole) return;
-    
+
     setIsLoading(true);
     analyticsEvents.roleSelected(selectedRole)
-    setRole(selectedRole as 'builder' | 'investor' | 'creator');
-    
+    setRole(selectedRole as 'participant' | 'host' | 'builder');
+
     setTimeout(() => {
       router.push('/onboarding/interests');
     }, 300);
@@ -55,30 +63,31 @@ export default function RoleSelectPage() {
   if (!profile?.address) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <p className="text-slate-400">Please connect your wallet first</p>
+        <p className="text-muted-foreground">Please connect your wallet first</p>
       </div>
     );
   }
 
   return (
-    <div className="relative min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-black overflow-hidden">
-      <FloatingParticles count={15} />
+    <div className="relative min-h-screen bg-background overflow-hidden">
+      {/* Particle Field Background */}
+      <ParticleField />
 
-      <div className="relative z-10 flex flex-col items-center justify-center min-h-screen px-4 py-8">
-        <div className="w-full max-w-4xl">
+      <div className="relative z-10 flex flex-col items-center justify-start min-h-screen px-4 pt-12 pb-8">
+        <div className="w-full max-w-lg space-y-6">
           {/* Header */}
           <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
-            className="text-center mb-12"
+            className="text-center mb-6"
           >
-            <h1 className="text-4xl font-bold text-white mb-2">Choose Your Role</h1>
-            <p className="text-slate-400">Select how you want to participate in the ecosystem</p>
+            <h1 className="text-3xl md:text-4xl font-bold text-white mb-1">Choose your role</h1>
+            <p className="text-sm md:text-base text-muted-foreground">How do you want to participate?</p>
           </motion.div>
 
           {/* Role cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <div className="grid grid-cols-1 gap-3 md:gap-4 mb-6">
             {roles.map((role, index) => {
               const Icon = role.icon;
               return (
@@ -88,36 +97,38 @@ export default function RoleSelectPage() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.1, duration: 0.5 }}
                   onClick={() => setSelectedRole(role.id)}
-                  className={`text-left transition-all ${
-                    selectedRole === role.id ? 'scale-105' : ''
-                  }`}
+                  className={`text-left transition-all w-full`}
                 >
-                  <HolographicCard className="h-full group cursor-pointer">
-                    <div className="space-y-4">
-                      {/* Icon */}
-                      <motion.div
-                        className={`inline-flex p-3 rounded-lg bg-gradient-to-br ${role.color} text-white`}
-                        whileHover={{ scale: 1.1 }}
-                      >
-                        <Icon className="w-6 h-6" />
-                      </motion.div>
-
-                      {/* Content */}
-                      <div>
-                        <h3 className="text-xl font-bold text-white mb-2">{role.title}</h3>
-                        <p className="text-slate-400 text-sm">{role.description}</p>
-                      </div>
-
-                      {/* Selection indicator */}
+                  <HolographicPanel className="h-full">
+                    <div className="relative h-full p-4 md:p-5 flex items-center gap-4">
                       {selectedRole === role.id && (
                         <motion.div
                           layoutId="activeRole"
-                          className="absolute inset-0 border-2 border-cyan-400 rounded-xl"
+                          className="absolute inset-0 border-2 border-primary rounded-xl"
                           initial={false}
                         />
                       )}
+                      <div className="space-y-0 relative flex-1">
+                        {/* Icon */}
+                        <motion.div
+                          className={`inline-flex p-2 md:p-3 rounded-lg ${selectedRole === role.id ? 'bg-primary/20 text-primary border border-primary/30' : 'bg-card border border-border'}`}
+                          whileHover={{ scale: 1.1 }}
+                        >
+                          <Icon className="w-5 h-5 md:w-6 md:h-6" />
+                        </motion.div>
+                        {/* Content */}
+                        <div className="mt-2">
+                          <h3 className="text-base md:text-lg font-bold text-white mb-1">{role.title}</h3>
+                          <p className="text-xs md:text-sm text-muted-foreground">{role.description}</p>
+                        </div>
+                      </div>
+                      {selectedRole === role.id && (
+                        <div className="relative">
+                          <CheckCircle2 className="w-5 h-5 md:w-6 md:h-6 text-primary" />
+                        </div>
+                      )}
                     </div>
-                  </HolographicCard>
+                  </HolographicPanel>
                 </motion.button>
               );
             })}
@@ -128,22 +139,26 @@ export default function RoleSelectPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4, duration: 0.5 }}
-            className="flex gap-4"
+            className="flex gap-3"
           >
             <Button
               onClick={() => router.back()}
               variant="outline"
-              className="flex-1"
+              className="flex-1 h-11"
             >
+              <ArrowLeft className="w-4 h-4 mr-2" />
               Back
             </Button>
-            <Button
-              onClick={handleContinue}
-              disabled={!selectedRole || isLoading}
-              className="flex-1 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white font-semibold"
-            >
-              {isLoading ? 'Continuing...' : 'Continue'}
-            </Button>
+            <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+              <Button
+                onClick={handleContinue}
+                disabled={!selectedRole || isLoading}
+                className="flex-1 glow-border font-semibold h-11"
+              >
+                {isLoading ? 'Continuing...' : 'Continue'}
+                <ArrowRight className="w-4 h-4 ml-2" />
+              </Button>
+            </motion.div>
           </motion.div>
         </div>
       </div>

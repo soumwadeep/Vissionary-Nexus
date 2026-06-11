@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { teams, teamMembers, teamInvitations, users } from '@/db/schema'
-import { eq, and } from 'drizzle-orm'
+import { eq, and, inArray } from 'drizzle-orm'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
 
@@ -62,7 +62,6 @@ export async function POST(request: NextRequest) {
       if (!team.length || team[0].leaderId !== session.user.id) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
       }
-
       let newInviteCode = generateInviteCode()
       let existingTeam = await db.select().from(teams).where(eq(teams.inviteCode, newInviteCode))
       while (existingTeam.length > 0) {
@@ -80,6 +79,9 @@ export async function POST(request: NextRequest) {
       const team = await db.select().from(teams).where(eq(teams.id, teamId))
       if (!team.length || team[0].leaderId !== session.user.id) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      }
+      if (!team[0].eventId) {
+        return NextResponse.json({ error: 'Team is not associated with an event' }, { status: 400 })
       }
 
       // Find user by email
@@ -118,7 +120,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Check if team is full
-      if (team[0].currentMembers >= team[0].maxMembers) {
+      if ((team[0].currentMembers ?? 0) >= (team[0].maxMembers ?? 5)) {
         return NextResponse.json({ error: 'Team is full' }, { status: 400 })
       }
 
@@ -136,7 +138,7 @@ export async function POST(request: NextRequest) {
 
       // Increment current members
       await db.update(teams).set({
-        currentMembers: team[0].currentMembers + 1,
+        currentMembers: (team[0].currentMembers ?? 0) + 1,
         updatedAt: new Date(),
       }).where(eq(teams.id, team[0].id))
 
@@ -165,6 +167,9 @@ export async function POST(request: NextRequest) {
       // If accepted, add as member
       if (accept) {
         const team = await db.select().from(teams).where(eq(teams.id, invitation[0].teamId))
+        if (!team.length) {
+          return NextResponse.json({ error: 'Team not found' }, { status: 404 })
+        }
         await db.insert(teamMembers).values({
           teamId: invitation[0].teamId,
           userId: session.user.id,
@@ -173,7 +178,7 @@ export async function POST(request: NextRequest) {
 
         // Increment current members
         await db.update(teams).set({
-          currentMembers: team[0].currentMembers + 1,
+          currentMembers: (team[0].currentMembers ?? 0) + 1,
           updatedAt: new Date(),
         }).where(eq(teams.id, invitation[0].teamId))
       }
@@ -209,7 +214,7 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ teams: [] })
       }
 
-      const myTeams = await db.select().from(teams).where(teams.id.inArray(teamIds))
+      const myTeams = await db.select().from(teams).where(inArray(teams.id, teamIds))
       return NextResponse.json({ teams: myTeams })
     }
 
@@ -234,9 +239,8 @@ export async function GET(request: NextRequest) {
         .where(eq(teamMembers.teamId, teamId))
 
       // Get pending invitations (if user is leader)
-      let invitations = []
-      if (team[0].leaderId === session.user.id) {
-        invitations = await db
+      const invitations = team[0].leaderId === session.user.id
+        ? await db
           .select({
             id: teamInvitations.id,
             teamId: teamInvitations.teamId,
@@ -250,7 +254,7 @@ export async function GET(request: NextRequest) {
           .from(teamInvitations)
           .leftJoin(users, eq(teamInvitations.inviteeId, users.id))
           .where(and(eq(teamInvitations.teamId, teamId), eq(teamInvitations.status, 'pending')))
-      }
+        : []
 
       return NextResponse.json({
         team: team[0],

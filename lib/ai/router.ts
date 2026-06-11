@@ -4,7 +4,7 @@ import { SYSTEM_PROMPTS } from "./system-prompts"
 import { checkInputGuardrails, checkOutputGuardrails } from "./guardrails"
 import { getFallbackRecommendations, getFallbackTasks, FallbackData } from "./fallback"
 
-export type AIFeature = "mentor" | "team_match" | "recommendations" | "task_planner"
+export type AIFeature = "mentor" | "team_match" | "recommendations" | "task_planner" | "nexus_agent"
 
 export interface AIRouterRequest {
   feature: AIFeature
@@ -146,10 +146,12 @@ export async function aiRouter(request: AIRouterRequest): Promise<AIRouterRespon
     }
 
     const response = await callNVIDIA(nVidiaMessages)
+    console.log(`📥 callNVIDIA returned for feature ${feature}`)
 
     // Step 3: Output guardrails check
     const outputCheck = checkOutputGuardrails(response.content)
     if (!outputCheck.passed) {
+      console.warn(`⚠️ Output guardrails failed for feature ${feature}`)
       return {
         success: false,
         error: outputCheck.reason,
@@ -159,14 +161,19 @@ export async function aiRouter(request: AIRouterRequest): Promise<AIRouterRespon
     }
 
     // Step 4: Parse and return response
+    const parsedData = parseAIResponse(response.content, feature, userData, input)
+    console.log(`✅ Parsed AI response for feature ${feature}`)
+    
     return {
       success: true,
-      data: parseAIResponse(response.content, feature, userData, input),
+      data: parsedData,
       usedFallback: false
     }
   } catch (error) {
     // Fallback on error
-    console.error(`AI Router error for feature ${feature}:`, error)
+    console.error(`❌ AI Router error for feature ${feature}:`)
+    console.error("  - Error message:", (error as any).message)
+    console.error("  - Full stack trace:", (error as any).stack)
     return {
       success: false,
       error: "AI service unavailable, using fallback",
@@ -184,6 +191,7 @@ function getFallbackData(feature: AIFeature, userData?: FallbackData, input?: st
     case "task_planner":
       return getFallbackTasks(userData?.userData || {})
     case "mentor":
+    case "nexus_agent":
       return getFallbackMentorResponse(userData, input || "")
     default:
       return []
@@ -192,8 +200,8 @@ function getFallbackData(feature: AIFeature, userData?: FallbackData, input?: st
 
 // Parse AI response
 function parseAIResponse(content: string, feature: AIFeature, userData?: FallbackData, input?: string) {
-  if (feature === "mentor") {
-    // Mentor just returns the string response
+  if (feature === "mentor" || feature === "nexus_agent") {
+    // Mentor and Nexus Agent just return the string response
     return content
   }
   

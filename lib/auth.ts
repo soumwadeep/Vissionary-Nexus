@@ -35,39 +35,70 @@ export const authOptions: NextAuthOptions = {
         password: { label: 'Password', type: 'password' },
       },
       async authorize(credentials) {
+        console.log('🔑 Login attempt:', { 
+          email: credentials?.email, 
+          hasPassword: !!credentials?.password 
+        });
+        
         if (!credentials?.email || !credentials?.password) {
-          return null
+          console.log('❌ Missing email or password');
+          return null;
         }
 
-        // Find user by email
-        const user = await db
-          .select()
-          .from(users)
-          .where(eq(users.email, credentials.email))
-          .limit(1)
+        try {
+          // Find user by email
+          console.log('🔍 Querying user from database...');
+          const user = await db
+            .select()
+            .from(users)
+            .where(eq(users.email, credentials.email))
+            .limit(1);
+          
+          console.log('📊 Database user result:', {
+            found: user.length !== 0,
+            userEmail: user[0]?.email,
+            hasPasswordInDb: !!user[0]?.password,
+            passwordPreview: user[0]?.password ? user[0].password.substring(0, 10) + '...' : 'null'
+          });
 
-        // Check if user exists and has a password
-        if (user.length === 0 || !user[0].password) {
-          return null
-        }
+          // Check if user exists and has a password
+          if (user.length === 0) {
+            console.log('❌ User not found');
+            return null;
+          }
+          if (!user[0].password) {
+            console.log('❌ User has no password (likely OAuth user)');
+            return null;
+          }
 
-        // Verify password
-        const passwordMatch = await bcryptjs.compare(
-          credentials.password,
-          user[0].password
-        )
+          // Verify password
+          console.log('🔐 Comparing passwords...');
+          const passwordMatch = await bcryptjs.compare(
+            credentials.password,
+            user[0].password
+          );
+          
+          console.log('🔓 Password match:', passwordMatch);
 
-        if (!passwordMatch) {
-          return null
-        }
+          if (!passwordMatch) {
+            console.log('❌ Invalid password');
+            return null;
+          }
 
-        // Return user data if password matches
-        return {
-          id: user[0].id,
-          email: user[0].email,
-          name: user[0].name || '',
-          image: user[0].avatar || '',
-          role: user[0].role || 'member',
+          console.log('✅ Login successful!');
+          
+          // Return user data if password matches
+          return {
+            id: user[0].id,
+            email: user[0].email,
+            name: user[0].name || '',
+            image: user[0].avatar || '',
+            role: user[0].role || 'member',
+          };
+        } catch (error) {
+          console.error('🚨 Authorize function error:', error);
+          console.error('🚨 Error stack:', (error as Error).stack);
+          return null;
         }
       },
     }),
@@ -77,7 +108,10 @@ export const authOptions: NextAuthOptions = {
     error: '/auth/error',
   },
   callbacks: {
-    async signIn({ user }) {
+    async signIn({ user, account, profile }) {
+      console.log("SignIn callback")
+      console.log("SignIn callback - user:", user)
+      console.log("SignIn callback - account:", account?.provider)
       if (!user.email) return false
 
       try {
@@ -110,7 +144,10 @@ export const authOptions: NextAuthOptions = {
     },
 
     async jwt({ token, user }) {
+      console.log("JWT callback")
+      console.log("Authenticated user:", token?.email)
       if (user) {
+        console.log("JWT callback - user from signIn:", user)
         token.email = user.email
         token.name = user.name
         token.picture = user.image
@@ -144,6 +181,7 @@ export const authOptions: NextAuthOptions = {
     },
 
     async session({ session, token }) {
+      console.log("Session callback")
       if (session.user) {
         session.user.id = token.id as string
         session.user.role = token.role as string
@@ -151,6 +189,7 @@ export const authOptions: NextAuthOptions = {
         session.user.name = token.name as string
         session.user.image = token.picture as string
       }
+      console.log("Session callback result:", session)
       return session
     },
   },

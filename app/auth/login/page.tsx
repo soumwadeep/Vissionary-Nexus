@@ -3,7 +3,7 @@
 import { motion } from 'framer-motion'
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -11,9 +11,12 @@ import { Separator } from '@/components/ui/separator'
 import { Github, Chrome, ArrowRight, Loader2 } from 'lucide-react'
 import { AnimatedNetworkBackground } from '@/components/animated-network-background'
 import { useAuth } from '@/hooks/use-auth'
+import { signIn } from 'next-auth/react'
 
 export default function LoginPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const callbackUrl = searchParams.get('callbackUrl') || '/dashboard'
   const { login, loginWithGoogle, loginWithGithub, isAuthenticated } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -22,10 +25,13 @@ export default function LoginPage() {
 
   // Redirect if already authenticated (using useEffect to avoid render-time state updates)
   useEffect(() => {
+    console.log("Login page - isAuthenticated:", isAuthenticated)
+    console.log("Login page - callbackUrl:", callbackUrl)
     if (isAuthenticated) {
-      router.push('/dashboard')
+      console.log("Login page - redirecting to callbackUrl:", callbackUrl)
+      router.push(callbackUrl)
     }
-  }, [isAuthenticated, router])
+  }, [isAuthenticated, router, callbackUrl])
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -38,7 +44,7 @@ export default function LoginPage() {
       if (result?.error) {
         setError(result.error)
       } else if (result?.ok) {
-        router.push('/dashboard')
+        router.push(callbackUrl)
       } else {
         setError('Invalid email or password')
       }
@@ -52,7 +58,10 @@ export default function LoginPage() {
   const handleGoogleLogin = async () => {
     setIsLoading(true)
     try {
-      await loginWithGoogle()
+      await signIn('google', {
+        redirect: true,
+        callbackUrl: callbackUrl,
+      })
     } catch (err) {
       setError('Failed to sign in with Google')
     } finally {
@@ -63,7 +72,10 @@ export default function LoginPage() {
   const handleGithubLogin = async () => {
     setIsLoading(true)
     try {
-      await loginWithGithub()
+      await signIn('github', {
+        redirect: true,
+        callbackUrl: callbackUrl,
+      })
     } catch (err) {
       setError('Failed to sign in with GitHub')
     } finally {

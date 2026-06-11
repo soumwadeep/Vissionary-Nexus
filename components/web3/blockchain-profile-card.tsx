@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { useState } from "react"
 import { nftBadges, NFTBadgeMini } from "./nft-achievements"
 import { networkMeta } from "@/lib/web3-config"
+import { formatUnits } from "viem"
 
 export function BlockchainProfileCard() {
   const { isConnected, address } = useAccount()
@@ -134,7 +135,7 @@ export function BlockchainProfileCard() {
           </div>
           <div className="text-center p-3 rounded-lg bg-background/50 border border-border/50">
             <div className="text-2xl font-bold">
-              {balance ? parseFloat(balance.formatted).toFixed(3) : "0"}
+              {balance ? parseFloat(formatUnits(balance.value, balance.decimals)).toFixed(3) : "0"}
             </div>
             <div className="text-xs text-muted-foreground">{balance?.symbol || "ETH"}</div>
           </div>
