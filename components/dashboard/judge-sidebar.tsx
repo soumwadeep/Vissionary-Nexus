@@ -21,7 +21,7 @@ import { cn } from "@/lib/utils"
 import { useAuth } from "@/hooks/use-auth"
 
 const menuItems = [
-  { icon: Home, label: "Home", href: "/" },
+  // { icon: Home, label: "Home", href: "/dashboard/judge" },
   { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard/judge" },
   { icon: FileText, label: "Submissions", href: "/dashboard/judge/submissions" },
   { icon: Scale, label: "Compare", href: "/dashboard/judge/compare" },
