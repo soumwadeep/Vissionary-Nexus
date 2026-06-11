@@ -23,7 +23,6 @@ import { cn } from "@/lib/utils"
 import { useAuth } from "@/hooks/use-auth"
 
 const menuItems = [
-  { icon: Home, label: "Home", href: "/" },
   { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard/host" },
   { icon: CalendarPlus, label: "Create Event", href: "/dashboard/host/events/create" },
   { icon: Users, label: "Participants", href: "/dashboard/host/participants" },
